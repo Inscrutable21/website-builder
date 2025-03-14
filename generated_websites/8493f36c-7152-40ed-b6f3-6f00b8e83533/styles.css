@@ -1,0 +1,226 @@
+/* styles.css */
+:root {
+    --primary-color: #3498db; /* Example primary color */
+    --secondary-color: #2ecc71; /* Example secondary color */
+    --background-color: #f4f4f4; /* Example background color */
+    --text-color: #333; /* Example text color */
+}
+
+body {
+    font-family: 'Arial', sans-serif; /* Example font */
+    line-height: 1.6;
+    margin: 0;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Ensure footer sticks to bottom */
+}
+
+
+header {
+  background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+  color: white;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);  
+}
+
+
+
+main {
+    padding: 20px;
+    flex: 1; /* Allow main content to expand */
+}
+
+
+
+section {
+    margin-bottom: 20px;
+    opacity: 0;  /* Initial opacity for fade-in */
+    transform: translateY(20px); /* Initial offset for slide-up */
+    transition: opacity 0.5s ease, transform 0.5s ease; /* Smooth transitions */
+
+}
+
+
+
+
+section h2 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--secondary-color); /* Subtle underline */
+    padding-bottom: 5px;
+}
+
+
+
+
+section ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+
+/* ... (rest of the styles) */
+
+
+section ul li {
+    margin-bottom: 15px;
+    background-color: white;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease; /* Smooth hover transition */
+}
+
+
+section ul li:hover {
+    transform: translateY(-5px); /* Lift up slightly on hover */
+}
+
+section ul li h3 {
+  color: var(--secondary-color);
+}
+
+
+footer {
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    padding: 10px;
+    margin-top: auto; /* Push footer to the bottom */
+}
+
+
+/* Responsive Design (Example breakpoint) */
+@media (max-width: 768px) {  /* Adjust breakpoint as needed */
+    body {
+        padding: 10px; /* Reduce padding on smaller screens */
+    }
+
+
+    section {
+        margin-bottom: 15px; /* Reduce spacing on smaller screens */
+
+    }
+}
+
+
+/* Subtle Background Pattern (Example) */
+/* body {
+    background-image: url("subtle_pattern.png");  
+    background-repeat: repeat;
+    background-size: cover;  
+} */
+/* Default animations and enhancements */
+:root {
+  --primary-color: #4361ee;
+  --secondary-color: #3a0ca3;
+  --accent-color: #f72585;
+  --text-color: #2b2d42;
+  --light-color: #f8f9fa;
+  --bg-color: #ffffff;
+  --transition-slow: 0.5s ease;
+  --transition-medium: 0.3s ease;
+  --transition-fast: 0.2s ease;
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 5px 20px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Smooth scrolling for the entire page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Base animation classes */
+.fade-in {
+  opacity: 0;
+  animation: fadeIn 0.8s ease forwards;
+  visibility: hidden;
+}
+
+.slide-in-left {
+  transform: translateX(-50px);
+  opacity: 0;
+  animation: slideInLeft 0.8s ease forwards;
+  visibility: hidden;
+}
+
+.slide-in-right {
+  transform: translateX(50px);
+  opacity: 0;
+  animation: slideInRight 0.8s ease forwards;
+  visibility: hidden;
+}
+
+.zoom-in {
+  transform: scale(0.9);
+  opacity: 0;
+  animation: zoomIn 0.8s ease forwards;
+  visibility: hidden;
+}
+
+/* Animation delay classes */
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.3s; }
+.delay-3 { animation-delay: 0.5s; }
+.delay-4 { animation-delay: 0.7s; }
+
+/* Keyframes definitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); visibility: visible; }
+}
+
+@keyframes slideInLeft {
+  to { transform: translateX(0); opacity: 1; visibility: visible; }
+}
+
+@keyframes slideInRight {
+  to { transform: translateX(0); opacity: 1; visibility: visible; }
+}
+
+@keyframes zoomIn {
+  to { transform: scale(1); opacity: 1; visibility: visible; }
+}
+
+/* Hover effects */
+.hover-lift {
+  transition: transform var(--transition-medium);
+}
+
+.hover-lift:hover {
+  transform: translateY(-5px);
+}
+
+.hover-shadow {
+  transition: box-shadow var(--transition-medium);
+}
+
+.hover-shadow:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Button animations */
+button, .button {
+  transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+button:after, .button:after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: -100%;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
+  transition: left 0.5s ease;
+}
+
+button:hover:after, .button:hover:after {
+  left: 100%;
+}
