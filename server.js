@@ -98,30 +98,24 @@ app.post('/generate-website', async (req, res) => {
 
     // Enhanced instruction for generating visually appealing websites
     const instruction = `
-      Generate a complete, professional static website based on the following content:
+    Create a complete and professional website using HTML, CSS, and JavaScript based on the following enhanced prompt:
 
-      ${enhancedPrompt}
+    ${enhancedPrompt}
 
-      Create a visually stunning, modern website with these requirements:
-      
-      1. Use an attractive design with bold typography, modern color schemes, and visual hierarchy
-      2. Include smooth animations and transitions for page elements
-      3. Use modern CSS features (flexbox/grid, variables, gradients)
-      4. Implement responsive design for all devices
-      5. Add interactive elements with hover effects
-      6. Use modern UI components (cards, buttons, navigation)
-      7. Include a visually impressive hero section
-      8. Use proper spacing and whitespace for readability
-      
-      The website should have:
-      1. A modern, professional aesthetic
-      2. Clean, organized code
-      3. Optimized performance
-      4. Cross-browser compatibility
-      
-      Please provide the complete code as separate HTML, CSS, and JavaScript files.
-      Present each file as a separate code block with the appropriate language identifier.
-    `;
+    The website should include the following key features:
+
+    1. A visually appealing layout that is suitable for the type of website being created (e.g., blog, portfolio, e-commerce).
+    2. Responsive design to ensure the website functions well on all devices and screen sizes.
+    3. Use modern CSS techniques for styling, including flexbox or grid for layout, and appropriate use of colors and typography.
+    4. Implement navigation elements that allow users to easily explore different sections of the site.
+    5. Include interactive features that enhance user engagement, such as forms, buttons, or animations.
+    6. Ensure clean, organized, and well-commented code for all HTML, CSS, and JavaScript files.
+    7. Optimize the website for performance and ensure compatibility across different browsers.
+
+    Please provide the complete code as separate HTML, CSS, and JavaScript files.
+    Present each file as a separate code block with the appropriate language identifier.
+`;
+
 
     // Get the Gemini model
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
@@ -187,12 +181,12 @@ app.post('/generate-website', async (req, res) => {
   }
 });
 
-// Add a specific route for the root path
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Add a route for favicon.ico to prevent 404 errors
+
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end(); // No content response
 });
