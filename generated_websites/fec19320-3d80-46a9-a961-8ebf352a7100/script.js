@@ -1,0 +1,1 @@
+// script.js -  Not needed for this basic example, but would be used for interactive elements if required.

@@ -1,0 +1,24 @@
+{
+  "name": "prompt-enhancer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "@huggingface/inference": "^3.5.2",
+    "archiver": "^7.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fs": "^0.0.1-security",
+    "openai": "^4.87.3",
+    "path": "^0.12.7",
+    "uuid": "^11.1.0"
+  }
+}
