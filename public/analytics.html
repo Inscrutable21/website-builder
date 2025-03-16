@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Analytics Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="analytics.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.2/heatmap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="dashboard-container">
+    <header class="dashboard-header">
+      <div class="header-content">
+        <div class="logo">
+          <i class="fas fa-chart-line"></i>
+          <h1>Website Analytics</h1>
+        </div>
+        <p class="tagline">Visualize user interactions and optimize your website</p>
+      </div>
+    </header>
+
+    <main class="dashboard-content">
+      <div class="website-selector">
+        <h2><i class="fas fa-search"></i> Enter Website ID</h2>
+        <div class="website-id-input">
+          <input type="text" id="websiteIdInput" placeholder="Enter the website ID to view its analytics data">
+          <button id="loadWebsiteBtn" class="primary-btn">
+            <i class="fas fa-search"></i>
+            Load Website
+          </button>
+        </div>
+        <div class="recent-websites">
+          <h3>Recent Websites</h3>
+          <div id="recentWebsites" class="recent-list">
+            <!-- Recent websites will be populated here -->
+          </div>
+        </div>
+      </div>
+
+      <div id="analyticsContent" class="analytics-content hidden">
+        <div class="analytics-header">
+          <h2 id="websiteTitle">Website Analytics</h2>
+          <div class="time-range">
+            <select id="timeRangeSelect">
+              <option value="day">Last 24 Hours</option>
+              <option value="week" selected>Last 7 Days</option>
+              <option value="month">Last 30 Days</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="stats-overview">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Visitors</h3>
+              <p id="visitorCount" class="stat-value">0</p>
+              <p id="visitorTrend" class="stat-trend">
+                <i class="fas fa-arrow-up"></i> 0%
+              </p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-mouse-pointer"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Clicks</h3>
+              <p id="clickCount" class="stat-value">0</p>
+              <p id="clickTrend" class="stat-trend">
+                <i class="fas fa-arrow-up"></i> 0%
+              </p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Avg. Time</h3>
+              <p id="avgTime" class="stat-value">0:00</p>
+              <p id="timeTrend" class="stat-trend">
+                <i class="fas fa-arrow-up"></i> 0%
+              </p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-scroll"></i>
+            </div>
+            <div class="stat-details">
+              <h3>Scroll Depth</h3>
+              <p id="scrollDepth" class="stat-value">0%</p>
+              <p id="scrollTrend" class="stat-trend">
+                <i class="fas fa-arrow-up"></i> 0%
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="analytics-panels">
+          <div class="panel heatmap-panel">
+            <div class="panel-header">
+              <h3><i class="fas fa-fire"></i> Interaction Heatmap</h3>
+              <div class="panel-controls">
+                <button id="toggleHeatmapBtn" class="control-btn" title="Toggle Heatmap">
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button id="resetHeatmapBtn" class="control-btn" title="Reset Heatmap Data">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+            <div class="panel-content">
+              <div class="iframe-container">
+                <iframe id="websiteFrame" srcdoc=""></iframe>
+                <div id="loadingIndicator" class="loading">
+                  <div class="spinner"></div>
+                  <p>Loading website and heatmap data...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel charts-panel">
+            <div class="panel-header">
+              <h3><i class="fas fa-chart-bar"></i> Engagement Metrics</h3>
+              <div class="panel-controls">
+                <select id="chartTypeSelect">
+                  <option value="visitors">Visitors</option>
+                  <option value="clicks">Clicks</option>
+                  <option value="time">Time on Page</option>
+                </select>
+              </div>
+            </div>
+            <div class="panel-content">
+              <canvas id="engagementChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="analytics-panels">
+          <div class="panel click-elements-panel">
+            <div class="panel-header">
+              <h3><i class="fas fa-hand-pointer"></i> Most Clicked Elements</h3>
+            </div>
+            <div class="panel-content">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Element</th>
+                    <th>Text</th>
+                    <th>Clicks</th>
+                    <th>% of Total</th>
+                  </tr>
+                </thead>
+                <tbody id="clickElementsTable">
+                  <!-- Table data will be populated here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel user-flow-panel">
+            <div class="panel-header">
+              <h3><i class="fas fa-project-diagram"></i> User Flow</h3>
+            </div>
+            <div class="panel-content">
+              <div id="userFlowContainer">
+                <!-- User flow visualization will be rendered here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="dashboard-footer">
+      <p>© 2025 AI Site Builder | <a href="/" class="footer-link">Back to Website Generator</a></p>
+    </footer>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // DOM Elements
+      const websiteIdInput = document.getElementById('websiteIdInput');
+      const loadWebsiteBtn = document.getElementById('loadWebsiteBtn');
+      const analyticsContent = document.getElementById('analyticsContent');
+      const websiteTitle = document.getElementById('websiteTitle');
+      const websiteFrame = document.getElementById('websiteFrame');
+      const loadingIndicator = document.getElementById('loadingIndicator');
+      const toggleHeatmapBtn = document.getElementById('toggleHeatmapBtn');
+      const resetHeatmapBtn = document.getElementById('resetHeatmapBtn');
+      const recentWebsites = document.getElementById('recentWebsites');
+      const timeRangeSelect = document.getElementById('timeRangeSelect');
+      const chartTypeSelect = document.getElementById('chartTypeSelect');
+      
+      // Stats elements
+      const visitorCount = document.getElementById('visitorCount');
+      const clickCount = document.getElementById('clickCount');
+      const avgTime = document.getElementById('avgTime');
+      const scrollDepth = document.getElementById('scrollDepth');
+      const visitorTrend = document.getElementById('visitorTrend');
+      const clickTrend = document.getElementById('clickTrend');
+      const timeTrend = document.getElementById('timeTrend');
+      const scrollTrend = document.getElementById('scrollTrend');
+      
+      // Table elements
+      const clickElementsTable = document.getElementById('clickElementsTable');
+      
+      // Charts
+      let engagementChart;
+      
+      // Current website ID and data
+      let currentWebsiteId = '';
+      let websiteData = null;
+      
+      // Check URL for websiteId parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const websiteIdParam = urlParams.get('websiteId');
+      
+      if (websiteIdParam) {
+        websiteIdInput.value = websiteIdParam;
+        loadWebsite(websiteIdParam);
+      }
+      
+      // Load recent websites from localStorage
+      function loadRecentWebsites() {
+        const recent = JSON.parse(localStorage.getItem('recentWebsites')) || [];
+        recentWebsites.innerHTML = '';
+        
+        if (recent.length === 0) {
+          recentWebsites.innerHTML = '<p class="empty-list">No recent websites</p>';
+          return;
+        }
+        
+        recent.forEach(website => {
+          const websiteItem = document.createElement('div');
+          websiteItem.className = 'recent-item';
+          websiteItem.innerHTML = `
+            <div class="recent-info">
+              <span class="recent-id">${website.id}</span>
+              <span class="recent-date">${formatDate(website.date)}</span>
+            </div>
+            <button class="load-recent-btn" data-id="${website.id}">
+              <i class="fas fa-external-link-alt"></i>
+            </button>
+          `;
+          recentWebsites.appendChild(websiteItem);
+        });
+        
+        // Add event listeners to recent website buttons
+        document.querySelectorAll('.load-recent-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const websiteId = this.getAttribute('data-id');
+            websiteIdInput.value = websiteId;
+            loadWebsite(websiteId);
+          });
+        });
+      }
+      
+      // Format date helper
+      function formatDate(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString();
+      }
+      
+      // Add to recent websites
+      function addToRecentWebsites(websiteId) {
+        const recent = JSON.parse(localStorage.getItem('recentWebsites')) || [];
+        
+        // Remove if already exists
+        const filtered = recent.filter(site => site.id !== websiteId);
+        
+        // Add to beginning of array
+        filtered.unshift({
+          id: websiteId,
+          date: Date.now()
+        });
+        
+        // Keep only last 5
+        const trimmed = filtered.slice(0, 5);
+        
+        localStorage.setItem('recentWebsites', JSON.stringify(trimmed));
+        loadRecentWebsites();
+      }
+      
+      // Initialize charts
+      function initCharts() {
+        const ctx = document.getElementById('engagementChart').getContext('2d');
+        
+        engagementChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'Visitors',
+              data: [],
+              backgroundColor: 'rgba(67, 97, 238, 0.2)',
+              borderColor: 'rgba(67, 97, 238, 1)',
+              borderWidth: 2,
+              tension: 0.3,
+              pointBackgroundColor: 'rgba(67, 97, 238, 1)'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0
+                }
+              }
+            }
+          }
+        });
+      }
+      
+      // Update chart data
+      function updateChartData(type, timeRange) {
+        const chartData = generateChartData(type, timeRange);
+        
+        engagementChart.data.labels = chartData.labels;
+        engagementChart.data.datasets[0].label = chartData.label;
+        engagementChart.data.datasets[0].data = chartData.data;
+        
+        engagementChart.update();
+      }
+      
+      // Generate mock chart data (replace with real data from API)
+      function generateChartData(type, timeRange) {
+        let days;
+        switch (timeRange) {
+          case 'day':
+            days = 1;
+            break;
+          case 'week':
+            days = 7;
+            break;
+          case 'month':
+            days = 30;
+            break;
+          case 'all':
+            days = 90; // Limit to 90 days for display
+            break;
+          default:
+            days = 7;
+        }
+        
+        const labels = [];
+        const data = [];
+        
+        // Generate dates for labels
+        for (let i = days - 1; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+          
+          // Generate random data based on type
+          let value;
+          switch (type) {
+            case 'visitors':
+              value = Math.floor(Math.random() * 100) + 10;
+              break;
+            case 'clicks':
+              value = Math.floor(Math.random() * 500) + 50;
+              break;
+            case 'time':
+              value = Math.floor(Math.random() * 300) + 30; // in seconds
+              break;
+            default:
+              value = Math.floor(Math.random() * 100);
+          }
+          
+          data.push(value);
+        }
+        
+        let label;
+        switch (type) {
+          case 'visitors':
+            label = 'Unique Visitors';
+            break;
+          case 'clicks':
+            label = 'Total Clicks';
+            break;
+          case 'time':
+            label = 'Average Time (seconds)';
+            break;
+          default:
+            label = 'Value';
+        }
+        
+        return { labels, data, label };
+      }
+      
+      // Format time helper
+      function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+      }
+      
+      // Load website data and initialize analytics
+      // Load website data and initialize analytics
+// Load website data and initialize analytics
+function loadWebsite(websiteId) {
+  if (!websiteId) {
+    alert('Please enter a valid Website ID');
+    return;
+  }
+  
+  currentWebsiteId = websiteId;
+  analyticsContent.classList.remove('hidden');
+  loadingIndicator.classList.remove('hidden');
+  
+  // Update URL parameter
+  const url = new URL(window.location);
+  url.searchParams.set('websiteId', websiteId);
+  window.history.pushState({}, '', url);
+  
+  // Add to recent websites
+  addToRecentWebsites(websiteId);
+  
+  // Fetch the website data with better error handling
+  fetch(`/website/${websiteId}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Website not found (Status: ${response.status})`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      websiteData = data;
+      
+      // Update title
+      websiteTitle.textContent = `Analytics for Website: ${websiteId}`;
+      
+      // Load the website in the iframe
+      websiteFrame.srcdoc = data.previewHtml;
+      
+      // Wait for iframe to load
+      websiteFrame.onload = function() {
+        // Initialize heatmap in the iframe
+        initializeIframeHeatmap();
+        
+        // Fetch website stats - with separate promise chain
+        fetch(`/website-stats/${websiteId}?timeRange=${timeRangeSelect.value}`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Stats not found (Status: ${response.status})`);
+            }
+            return response.json();
+          })
+          .then(stats => {
+            // Update stats
+            updateStats(stats);
+            
+            // Initialize or update charts
+            if (!engagementChart) {
+              initCharts();
+            }
+            updateChartData(chartTypeSelect.value, timeRangeSelect.value);
+            
+            // Update most clicked elements table
+            updateClickElementsTable(stats.clickElements || []);
+          })
+          .catch(error => {
+            console.error('Error loading website stats:', error);
+            // Continue showing the website even if stats fail to load
+          })
+          .finally(() => {
+            // Hide loading indicator
+            loadingIndicator.classList.add('hidden');
+          });
+      };
+    })
+    .catch(error => {
+      console.error('Error loading website:', error);
+      
+      // Create a fallback demo website for testing
+      const fallbackHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Demo Website</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #4361ee; }
+            .container { max-width: 800px; margin: 0 auto; }
+            .btn { 
+              display: inline-block; 
+              padding: 10px 20px; 
+              background: #4361ee; 
+              color: white; 
+              border-radius: 5px;
+              cursor: pointer;
+              margin: 10px 5px;
+            }
+            .content { margin: 20px 0; line-height: 1.6; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Demo Website</h1>
+            <div class="content">
+              <p>This is a sample website for testing analytics.</p>
+              <p>The actual website with ID: ${websiteId} was not found, but you can still see how the heatmap works.</p>
+              <p>Try clicking on different parts of this page to generate heatmap data.</p>
+            </div>
+            <div class="buttons">
+              <button class="btn">Click Me</button>
+              <button class="btn">Another Button</button>
+              <button class="btn">Third Button</button>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Update UI with fallback content
+      websiteTitle.textContent = `Demo Analytics (Website ID: ${websiteId} not found)`;
+      websiteFrame.srcdoc = fallbackHtml;
+      
+      // Wait for iframe to load
+      websiteFrame.onload = function() {
+        // Initialize heatmap in the iframe
+        initializeIframeHeatmap();
+        
+        // Use mock stats
+        const mockStats = {
+          uniqueVisitors: 42,
+          totalClicks: 156,
+          averageTimeOnPage: 120, // 2 minutes
+          averageScrollDepth: 65,
+          visitorsTrend: 8,
+          clicksTrend: 12,
+          timeTrend: -3,
+          scrollTrend: 5,
+          lastActivity: Date.now(),
+          clickElements: [
+            { path: 'button.btn', text: 'Click Me', count: 78 },
+            { path: 'div.container', text: '', count: 34 },
+            { path: 'button.btn:nth-child(2)', text: 'Another Button', count: 29 },
+            { path: 'h1', text: 'Demo Website', count: 15 }
+          ]
+        };
+        
+        // Update UI with mock data
+        updateStats(mockStats);
+        if (!engagementChart) {
+          initCharts();
+        }
+        updateChartData(chartTypeSelect.value, timeRangeSelect.value);
+        updateClickElementsTable(mockStats.clickElements);
+      };
+      
+      // Hide loading indicator
+      loadingIndicator.classList.add('hidden');
+    });
+}
+
+      
+      // Initialize heatmap in the iframe
+      function initializeIframeHeatmap() {
+        const iframeDoc = websiteFrame.contentDocument || websiteFrame.contentWindow.document;
+        
+        // Create heatmap container in the iframe if it doesn't exist
+        let heatmapContainer = iframeDoc.getElementById('heatmapContainer');
+        if (!heatmapContainer) {
+          heatmapContainer = iframeDoc.createElement('div');
+          heatmapContainer.id = 'heatmapContainer';
+          heatmapContainer.style.width = '100%';
+          heatmapContainer.style.height = '100%';
+          heatmapContainer.style.position = 'absolute';
+          heatmapContainer.style.top = '0';
+          heatmapContainer.style.left = '0';
+          heatmapContainer.style.zIndex = '9999';
+          heatmapContainer.style.pointerEvents = 'none';
+          
+          iframeDoc.body.appendChild(heatmapContainer);
+        }
+        
+        // Load heatmap.js in the iframe if needed
+        if (typeof iframeDoc.defaultView.h337 === 'undefined') {
+          const script = iframeDoc.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.2/heatmap.min.js';
+          script.onload = function() {
+            createHeatmapInstance(iframeDoc, heatmapContainer);
+          };
+          iframeDoc.head.appendChild(script);
+        } else {
+          createHeatmapInstance(iframeDoc, heatmapContainer);
+        }
+      }
+      
+      // Create heatmap instance and load data
+      function createHeatmapInstance(iframeDoc, heatmapContainer) {
+        const h337 = iframeDoc.defaultView.h337;
+        
+        // Initialize heatmap in the iframe
+        const heatmapInstance = h337.create({
+          container: heatmapContainer,
+          radius: 30,
+          maxOpacity: 0.6,
+          minOpacity: 0,
+          blur: 0.75
+        });
+        
+        // Load heatmap data
+        fetch(`/get-heatmap-data/${currentWebsiteId}`)
+          .then(response => response.json())
+          .then(heatmapData => {
+            if (heatmapData && heatmapData.length > 0) {
+              // Find the maximum count value for proper scaling
+              const maxValue = Math.max(...heatmapData.map(item => item.count || 1));
+              
+              // Format data for heatmap.js
+              const formattedData = {
+                max: maxValue,
+                data: heatmapData.map(item => ({
+                  x: item.x,
+                  y: item.y,
+                  value: item.count || 1
+                }))
+              };
+              
+              // Set data to heatmap in one batch operation
+              heatmapInstance.setData(formattedData);
+            }
+          })
+          .catch(error => {
+            console.error('Error loading heatmap data:', error);
+          });
+          
+        // Store the heatmap instance reference for later use
+        iframeDoc.defaultView.heatmapInstance = heatmapInstance;
+      }
+      
+      // Update stats display
+      function updateStats(stats) {
+        // Real data would come from the API
+        visitorCount.textContent = stats.uniqueVisitors || 0;
+        clickCount.textContent = stats.totalClicks || 0;
+        avgTime.textContent = formatTime(stats.averageTimeOnPage || 0);
+        scrollDepth.textContent = `${Math.round(stats.averageScrollDepth || 0)}%`;
+        
+        // Update trends
+        updateTrend(visitorTrend, stats.visitorsTrend);
+        updateTrend(clickTrend, stats.clicksTrend);
+        updateTrend(timeTrend, stats.timeTrend);
+        updateTrend(scrollTrend, stats.scrollTrend);
+      }
+      
+      // Update trend indicators
+      function updateTrend(element, value) {
+        if (!value) value = 0;
+        
+        const icon = element.querySelector('i');
+        icon.className = value >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+        element.style.color = value >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+        element.innerHTML = `<i class="${icon.className}"></i> ${Math.abs(value)}%`;
+      }
+      
+      // Update click elements table
+      function updateClickElementsTable(elements) {
+        clickElementsTable.innerHTML = '';
+        
+        if (!elements || elements.length === 0) {
+          clickElementsTable.innerHTML = '<tr><td colspan="4" class="empty-table">No click data available</td></tr>';
+          return;
+        }
+        
+        // Calculate total clicks
+        const totalClicks = elements.reduce((sum, el) => sum + el.count, 0);
+        
+        elements.forEach(element => {
+          const row = document.createElement('tr');
+          const percentage = ((element.count / totalClicks) * 100).toFixed(1);
+          
+          row.innerHTML = `
+            <td>${element.path || 'Unknown'}</td>
+            <td>${element.text || ''}</td>
+            <td>${element.count}</td>
+            <td>
+              <div class="percentage-bar">
+                <div class="percentage-fill" style="width: ${percentage}%"></div>
+                <span>${percentage}%</span>
+              </div>
+            </td>
+          `;
+          
+          clickElementsTable.appendChild(row);
+        });
+      }
+      
+      // Event Listeners
+      loadWebsiteBtn.addEventListener('click', function() {
+        const websiteId = websiteIdInput.value.trim();
+        loadWebsite(websiteId);
+      });
+      
+      // Enter key in input field
+      websiteIdInput.addEventListener('keyup', function(event) {
+        if (event.key === 'Enter') {
+          loadWebsiteBtn.click();
+        }
+      });
+      
+      toggleHeatmapBtn.addEventListener('click', function() {
+        const iframe = websiteFrame.contentDocument || websiteFrame.contentWindow.document;
+        const heatmapContainer = iframe.getElementById('heatmapContainer');
+        
+        if (heatmapContainer) {
+          heatmapContainer.style.display = 
+            heatmapContainer.style.display === 'none' ? 'block' : 'none';
+          
+          // Update button icon
+          toggleHeatmapBtn.innerHTML = 
+            heatmapContainer.style.display === 'none' ? 
+            '<i class="fas fa-eye"></i>' : 
+            '<i class="fas fa-eye-slash"></i>';
+        }
+      });
+      
+      resetHeatmapBtn.addEventListener('click', function() {
+        if (!currentWebsiteId) return;
+        
+        if (confirm('Are you sure you want to reset all heatmap data for this website? This action cannot be undone.')) {
+          fetch(`/reset-heatmap-data/${currentWebsiteId}`, {
+            method: 'POST'
+          })
+            .then(response => {
+              if (response.ok) {
+                // Reload the website to clear the heatmap
+                loadWebsite(currentWebsiteId);
+              } else {
+                throw new Error('Failed to reset heatmap data');
+              }
+            })
+            .catch(error => {
+              console.error('Error resetting heatmap data:', error);
+              alert(`Error: ${error.message}`);
+            });
+        }
+      });
+      
+      timeRangeSelect.addEventListener('change', function() {
+  if (currentWebsiteId) {
+    // Reload stats with new time range
+    fetch(`/website-stats/${currentWebsiteId}?timeRange=${this.value}`)  // Make sure this URL is correct
+      .then(response => response.json())
+      .then(stats => {
+        updateStats(stats);
+        updateChartData(chartTypeSelect.value, this.value);
+        updateClickElementsTable(stats.clickElements || []);
+      })
+      .catch(error => {
+        console.error('Error updating stats:', error);
+      });
+  }
+});
+
+      
+      chartTypeSelect.addEventListener('change', function() {
+        updateChartData(this.value, timeRangeSelect.value);
+      });
+      
+      // Load recent websites on page load
+      loadRecentWebsites();
+    });
+  </script>
+</body>
+</html>

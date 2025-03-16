@@ -67,8 +67,14 @@ body {
 }
 
 @keyframes sparkle {
-  0% { opacity: 0.7; text-shadow: 0 0 5px rgba(67, 97, 238, 0.5); }
-  100% { opacity: 1; text-shadow: 0 0 15px rgba(67, 97, 238, 0.8); }
+  0% {
+    opacity: 0.7;
+    text-shadow: 0 0 5px rgba(67, 97, 238, 0.5);
+  }
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 15px rgba(67, 97, 238, 0.8);
+  }
 }
 
 .logo h1 {
@@ -171,7 +177,7 @@ body {
 
 @media (max-width: 992px) {
   .editor-container {
-      grid-template-columns: 1fr;
+    grid-template-columns: 1fr;
   }
 }
 
@@ -184,6 +190,7 @@ body {
   height: 500px;
   transition: transform var(--transition-normal), box-shadow var(--transition-normal);
   overflow: hidden;
+  position: relative;
 }
 
 .editor:hover {
@@ -316,6 +323,15 @@ textarea:focus {
   background-color: #6008a1;
 }
 
+.analytics-btn {
+  background-color: var(--accent-color);
+  color: var(--white);
+}
+
+.analytics-btn:hover {
+  background-color: #d91a6b;
+}
+
 /* Loading Animation */
 .loading-container {
   position: absolute;
@@ -353,11 +369,11 @@ textarea:focus {
 }
 
 @keyframes bounce {
-  0%, 80%, 100% { 
-      transform: scale(0);
-  } 
-  40% { 
-      transform: scale(1.0);
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1.0);
   }
 }
 
@@ -380,12 +396,12 @@ textarea:focus {
 
 @keyframes slideUp {
   from {
-      opacity: 0;
-      transform: translateY(30px);
+    opacity: 0;
+    transform: translateY(30px);
   }
   to {
-      opacity: 1;
-      transform: translateY(0);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -443,6 +459,19 @@ textarea:focus {
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
 
+.footer-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: var(--transition-fast);
+}
+
+.footer-link:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
 /* Utility Classes */
 .hidden {
   display: none !important;
@@ -481,42 +510,80 @@ textarea:focus {
   font-size: 0.9rem;
 }
 
+/* Animations */
+.shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  20%, 80% {
+    transform: translate3d(2px, 0, 0);
+  }
+  30%, 50%, 70% {
+    transform: translate3d(-4px, 0, 0);
+  }
+  40%, 60% {
+    transform: translate3d(4px, 0, 0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
   .app-main {
-      padding: 1rem;
+    padding: 1rem;
   }
   
   .workflow-steps {
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
   }
   
   .workflow-steps::before {
-      display: none;
+    display: none;
   }
   
   .step {
-      width: 100%;
-      flex-direction: row;
-      justify-content: flex-start;
-      gap: 1rem;
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 1rem;
   }
   
   .step-number {
-      margin-bottom: 0;
+    margin-bottom: 0;
   }
   
   .editor {
-      height: 400px;
+    height: 400px;
   }
   
   .preview-frame {
-      height: 400px;
+    height: 400px;
   }
   
   .preview-footer {
-      flex-direction: column;
+    flex-direction: column;
   }
 }
