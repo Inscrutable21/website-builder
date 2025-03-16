@@ -1,8 +1,4 @@
-/**
- * Utility helper functions for the website generator and analytics
- */
 
-// Format date to readable string
 function formatDate(timestamp) {
     if (!timestamp) return 'Unknown';
     
@@ -15,8 +11,6 @@ function formatDate(timestamp) {
       minute: '2-digit'
     });
   }
-  
-  // Format time duration from seconds
   function formatDuration(seconds) {
     if (!seconds || isNaN(seconds)) return '0:00';
     
@@ -24,16 +18,12 @@ function formatDate(timestamp) {
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
-  
-  // Calculate percentage change between two values
   function calculatePercentageChange(current, previous) {
     if (!previous || previous === 0) return 0;
     
     const change = ((current - previous) / previous) * 100;
     return Math.round(change);
   }
-  
-  // Generate a random ID
   function generateId(length = 8) {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let id = '';
@@ -44,8 +34,6 @@ function formatDate(timestamp) {
     
     return id;
   }
-  
-  // Extract HTML, CSS, and JavaScript from Gemini API response
   function extractCodeFromResponse(responseText) {
     const htmlMatch = responseText.match(/```html\s*([\s\S]*?)\s*```/);
     const cssMatch = responseText.match(/```css\s*([\s\S]*?)\s*```/);
@@ -62,8 +50,6 @@ function formatDate(timestamp) {
       js: jsMatch ? jsMatch[1] : ''
     };
   }
-  
-  // Create a complete HTML document with heatmap integration
   function createCompleteHtml(html, css, js, websiteId) {
     return `
       <!DOCTYPE html>
@@ -88,8 +74,6 @@ function formatDate(timestamp) {
       </html>
     `;
   }
-  
-  // Format markdown to HTML
   function formatMarkdown(text) {
     if (!text) return '';
     
@@ -102,8 +86,6 @@ function formatDate(timestamp) {
       // Line breaks
       .replace(/\n/g, '<br>');
   }
-  
-  // Sanitize text to prevent XSS
   function sanitizeText(text) {
     if (!text) return '';
     
@@ -114,8 +96,6 @@ function formatDate(timestamp) {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
-  
-  // Group interactions by date for charts
   function groupInteractionsByDate(interactions, timeRange = 'week') {
     if (!interactions || !interactions.length) return [];
     
@@ -142,15 +122,10 @@ function formatDate(timestamp) {
         startDate = new Date(now);
         startDate.setDate(now.getDate() - 7);
     }
-    
-    // Filter interactions by date range
-      // Filter interactions by date range
   const filteredInteractions = interactions.filter(interaction => {
     const interactionDate = new Date(interaction.timestamp);
     return interactionDate >= startDate && interactionDate <= now;
   });
-  
-  // Group by date
   const groupedByDate = {};
   
   filteredInteractions.forEach(interaction => {
@@ -186,8 +161,6 @@ function formatDate(timestamp) {
       groupedByDate[dateKey].visitors.add(interaction.sessionId);
     }
   });
-  
-  // Convert to array and calculate averages
   return Object.values(groupedByDate).map(day => {
     return {
       date: day.date,
@@ -199,12 +172,8 @@ function formatDate(timestamp) {
     };
   }).sort((a, b) => a.date.localeCompare(b.date));
 }
-
-// Calculate stats trends by comparing current and previous periods
 function calculateTrends(currentPeriod, previousPeriod) {
   if (!currentPeriod || !previousPeriod) return {};
-  
-  // Sum up metrics for each period
   const current = {
     visitors: currentPeriod.reduce((sum, day) => sum + day.visitors, 0),
     clicks: currentPeriod.reduce((sum, day) => sum + day.clicks, 0),
@@ -216,16 +185,12 @@ function calculateTrends(currentPeriod, previousPeriod) {
     clicks: previousPeriod.reduce((sum, day) => sum + day.clicks, 0),
     avgTime: previousPeriod.reduce((sum, day) => sum + day.avgTimeSpent, 0) / previousPeriod.length || 0
   };
-  
-  // Calculate percentage changes
   return {
     visitorsTrend: calculatePercentageChange(current.visitors, previous.visitors),
     clicksTrend: calculatePercentageChange(current.clicks, previous.clicks),
     timeTrend: calculatePercentageChange(current.avgTime, previous.avgTime)
   };
 }
-
-// Group click interactions by element path
 function groupClicksByElement(interactions) {
   if (!interactions || !interactions.length) return [];
   
@@ -244,14 +209,10 @@ function groupClicksByElement(interactions) {
     
     elementCounts[path].count++;
   });
-  
-  // Convert to array and sort by count (descending)
   return Object.values(elementCounts)
     .sort((a, b) => b.count - a.count)
     .slice(0, 10); // Return top 10 elements
 }
-
-// Throttle function to limit how often a function can be called
 function throttle(callback, delay) {
   let lastCall = 0;
   
@@ -264,8 +225,6 @@ function throttle(callback, delay) {
     }
   };
 }
-
-// Debounce function to ensure a function is not called until after a certain amount of time has passed
 function debounce(callback, delay) {
   let timeoutId;
   
@@ -277,7 +236,6 @@ function debounce(callback, delay) {
     }, delay);
   };
 }
-
 module.exports = {
   formatDate,
   formatDuration,

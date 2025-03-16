@@ -1,9 +1,11 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 
 class AIService {
   constructor(apiKey) {
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    this.openai = new OpenAI({
+      apiKey: apiKey
+    });
+    this.model = "gpt-4o-mini"; // Using GPT-4o Mini model
   }
   
   async enhancePrompt(rawPrompt) {
@@ -19,9 +21,16 @@ class AIService {
       Return only the enhanced formatted text, without any explanations or additional notes.
     `;
     
-    const result = await this.model.generateContent(instruction);
-    const response = await result.response;
-    return response.text();
+    const completion = await this.openai.chat.completions.create({
+      model: this.model,
+      messages: [
+        { role: "system", content: "You are a helpful assistant that formats and structures content professionally." },
+        { role: "user", content: instruction }
+      ],
+      temperature: 0.7,
+    });
+    
+    return completion.choices[0].message.content;
   }
   
   async generateWebsite(enhancedPrompt) {
@@ -41,9 +50,17 @@ class AIService {
       Please provide the complete code as separate HTML, CSS, and JavaScript files. Present each file as a separate code block with the appropriate language identifier.
     `;
     
-    const result = await this.model.generateContent(instruction);
-    const response = await result.response;
-    return response.text();
+    const completion = await this.openai.chat.completions.create({
+      model: this.model,
+      messages: [
+        { role: "system", content: "You are a skilled web developer who creates beautiful, responsive websites with clean code." },
+        { role: "user", content: instruction }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000, // Adjust based on your needs
+    });
+    
+    return completion.choices[0].message.content;
   }
 }
 

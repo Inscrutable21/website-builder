@@ -1,5 +1,6 @@
 /**
  * Main server file for AI Website Generator with Heatmap Analytics
+ * Using OpenAI GPT-4o Mini
  */
 
 // Import dependencies
@@ -8,6 +9,7 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const { v4: uuidv4 } = require('uuid');
+const OpenAI = require('openai');
 
 // Load environment variables
 dotenv.config();
@@ -118,20 +120,21 @@ const inMemoryDatabase = {
   }
 };
 
-// Check if we have a Gemini API key
-const apiKey = process.env.GEMINI_API_KEY;
+// Check if we have an OpenAI API key
+const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) {
-  console.warn('WARNING: GEMINI_API_KEY is not set. The AI generation endpoints will not work.');
+  console.warn('WARNING: OPENAI_API_KEY is not set. The AI generation endpoints will not work.');
 }
 
-// Initialize Gemini client if API key is available
-let genAI = null;
+// Initialize OpenAI client if API key is available
+let openai = null;
 if (apiKey) {
   try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    genAI = new GoogleGenerativeAI(apiKey);
+    openai = new OpenAI({
+      apiKey: apiKey
+    });
   } catch (error) {
-    console.error('Error initializing Gemini client:', error);
+    console.error('Error initializing OpenAI client:', error);
   }
 }
 
@@ -274,9 +277,9 @@ app.post('/enhance-prompt', async (req, res) => {
   try {
     console.log('Enhance prompt request received');
 
-    // Check if Gemini client is initialized
-    if (!genAI) {
-      return res.status(500).json({ error: 'Gemini API key not configured. Please set the GEMINI_API_KEY environment variable.' });
+    // Check if OpenAI client is initialized
+    if (!openai) {
+      return res.status(500).json({ error: 'OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable.' });
     }
 
     const { rawPrompt } = req.body;
@@ -300,18 +303,22 @@ app.post('/enhance-prompt', async (req, res) => {
       Return only the enhanced formatted text, without any explanations or additional notes.
     `;
 
-    // Get the Gemini model
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    // Call the OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a helpful assistant that formats and structures content professionally." },
+        { role: "user", content: instruction }
+      ],
+      temperature: 0.7,
+    });
 
-    // Call the Gemini model
-    const result = await model.generateContent(instruction);
-    const response = await result.response;
-    const enhancedPrompt = response.text();
+    const enhancedPrompt = completion.choices[0].message.content;
     
     console.log('Successfully enhanced prompt');
     
     if (!enhancedPrompt) {
-      throw new Error('Invalid response from Gemini API');
+      throw new Error('Invalid response from OpenAI API');
     }
     
     res.json({ enhancedPrompt });
@@ -326,8 +333,8 @@ app.post('/generate-website', async (req, res) => {
   try {
     console.log('Generate website request received');
     
-    if (!genAI) {
-      return res.status(500).json({ error: 'Gemini API key not configured. Please set the GEMINI_API_KEY environment variable.' });
+    if (!openai) {
+      return res.status(500).json({ error: 'OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable.' });
     }
     
     const { enhancedPrompt } = req.body;
@@ -354,13 +361,21 @@ app.post('/generate-website', async (req, res) => {
       Please provide the complete code as separate HTML, CSS, and JavaScript files. Present each file as a separate code block with the appropriate language identifier.
     `;
     
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    const result = await model.generateContent(instruction);
-    const response = await result.response;
-    const generatedContent = response.text();
+    // Call the OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a skilled web developer who creates beautiful, responsive websites with clean code." },
+        { role: "user", content: instruction }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000, // Adjust based on your needs
+    });
+    
+    const generatedContent = completion.choices[0].message.content;
     
     if (!generatedContent) {
-      throw new Error('Invalid response from Gemini API');
+      throw new Error('Invalid response from OpenAI API');
     }
     
     console.log('Successfully generated website content');
@@ -839,7 +854,7 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
-  console.log(`Gemini API Key configured: ${!!apiKey}`);
+  console.log(`OpenAI API Key configured: ${!!apiKey}`);
   console.log(`Database connection: ${dbConnected ? 'connected' : 'using in-memory database'}`);
   console.log(`Analytics dashboard available at: http://localhost:${port}/analytics`);
   console.log(`Test page available at: http://localhost:${port}/test-analytics`);

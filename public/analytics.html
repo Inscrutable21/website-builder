@@ -216,12 +216,9 @@
       
       // Charts
       let engagementChart;
-      
-      // Current website ID and data
       let currentWebsiteId = '';
       let websiteData = null;
-      
-      // Check URL for websiteId parameter
+ 
       const urlParams = new URLSearchParams(window.location.search);
       const websiteIdParam = urlParams.get('websiteId');
       
@@ -229,8 +226,6 @@
         websiteIdInput.value = websiteIdParam;
         loadWebsite(websiteIdParam);
       }
-      
-      // Load recent websites from localStorage
       function loadRecentWebsites() {
         const recent = JSON.parse(localStorage.getItem('recentWebsites')) || [];
         recentWebsites.innerHTML = '';
@@ -254,8 +249,6 @@
           `;
           recentWebsites.appendChild(websiteItem);
         });
-        
-        // Add event listeners to recent website buttons
         document.querySelectorAll('.load-recent-btn').forEach(btn => {
           btn.addEventListener('click', function() {
             const websiteId = this.getAttribute('data-id');
@@ -264,34 +257,22 @@
           });
         });
       }
-      
-      // Format date helper
       function formatDate(timestamp) {
         const date = new Date(timestamp);
         return date.toLocaleDateString();
       }
-      
-      // Add to recent websites
       function addToRecentWebsites(websiteId) {
         const recent = JSON.parse(localStorage.getItem('recentWebsites')) || [];
-        
-        // Remove if already exists
         const filtered = recent.filter(site => site.id !== websiteId);
-        
-        // Add to beginning of array
         filtered.unshift({
           id: websiteId,
           date: Date.now()
         });
-        
-        // Keep only last 5
         const trimmed = filtered.slice(0, 5);
         
         localStorage.setItem('recentWebsites', JSON.stringify(trimmed));
         loadRecentWebsites();
       }
-      
-      // Initialize charts
       function initCharts() {
         const ctx = document.getElementById('engagementChart').getContext('2d');
         
@@ -332,8 +313,6 @@
           }
         });
       }
-      
-      // Update chart data
       function updateChartData(type, timeRange) {
         const chartData = generateChartData(type, timeRange);
         
@@ -366,14 +345,11 @@
         
         const labels = [];
         const data = [];
-        
-        // Generate dates for labels
         for (let i = days - 1; i >= 0; i--) {
           const date = new Date();
           date.setDate(date.getDate() - i);
           labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-          
-          // Generate random data based on type
+
           let value;
           switch (type) {
             case 'visitors':
