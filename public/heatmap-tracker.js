@@ -318,4 +318,176 @@ function initializeHeatmap(websiteId) {
     console.log(`Heatmap initialized for website ID: ${websiteId}`);
     console.log('Press Ctrl+Alt+H to toggle heatmap visibility');
   }
+  // Add this to your heatmap-tracker.js file
+
+// Track click count and trigger optimization
+let clickCount = 0;
+const OPTIMIZATION_THRESHOLD = 50; // Number of clicks before optimization
+
+// Modify the recordClick function to count clicks and trigger optimization
+function recordClick(event) {
+  const clickPoint = {
+    websiteId: websiteId,
+    x: event.pageX,
+    y: event.pageY,
+    value: 1,
+    timestamp: Date.now(),
+    type: 'click',
+    sessionId: sessionId,
+    path: getElementPath(event.target),
+    elementText: getElementText(event.target)
+  };
   
+  // Add to local storage
+  interactionData.push(clickPoint);
+  
+  // Send to server
+  sendToServer(clickPoint);
+  
+  // Update local heatmap visualization
+  heatmapInstance.addData({
+    x: clickPoint.x,
+    y: clickPoint.y,
+    value: clickPoint.value
+  });
+  
+  // Increment click counter
+  clickCount++;
+  
+  // Check if we should trigger optimization
+  if (clickCount % OPTIMIZATION_THRESHOLD === 0) {
+    triggerOptimization();
+  }
+}
+
+// Function to trigger UI optimization
+function triggerOptimization() {
+  console.log(`Optimization threshold reached (${clickCount} clicks). Triggering UI optimization...`);
+  
+  // Send optimization request to server
+  fetch(`/optimize-ui/${websiteId}`, {
+    method: 'POST'
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Failed to optimize UI');
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (data.optimizedWebsiteId) {
+      console.log('UI successfully optimized!', data.optimizedWebsiteId);
+      
+      // Show notification to user
+      showOptimizationNotification(data.optimizedWebsiteId);
+    } else {
+      console.log('Optimization response:', data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error optimizing UI:', error);
+  });
+}
+
+// Function to show optimization notification
+function showOptimizationNotification(optimizedId) {
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.className = 'optimization-notification';
+  notification.innerHTML = `
+    <div class="notification-content">
+      <h3>UI Optimized!</h3>
+      <p>Based on user interactions, we've created an optimized version of this page.</p>
+      <div class="notification-actions">
+        <button class="view-optimized-btn">View Optimized Version</button>
+        <button class="dismiss-btn">Continue with Current Version</button>
+      </div>
+    </div>
+  `;
+  
+  // Add styles
+  const style = document.createElement('style');
+  style.textContent = `
+    .optimization-notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      z-index: 10000;
+      max-width: 350px;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateY(100px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    .notification-content {
+      padding: 15px;
+    }
+    
+    .notification-content h3 {
+      margin: 0 0 10px;
+      color: #4361ee;
+    }
+    
+    .notification-content p {
+      margin: 0 0 15px;
+      font-size: 14px;
+    }
+    
+    .notification-actions {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .view-optimized-btn, .dismiss-btn {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .view-optimized-btn {
+      background: #4361ee;
+      color: white;
+    }
+    
+    .dismiss-btn {
+      background: #e9ecef;
+      color: #495057;
+    }
+  `;
+  
+  document.head.appendChild(style);
+  document.body.appendChild(notification);
+  
+  // Add event listeners
+  const viewBtn = notification.querySelector('.view-optimized-btn');
+  const dismissBtn = notification.querySelector('.dismiss-btn');
+  
+  viewBtn.addEventListener('click', () => {
+    window.location.href = `/website/${optimizedId}`;
+  });
+  
+  dismissBtn.addEventListener('click', () => {
+    notification.remove();
+  });
+  
+  // Auto-dismiss after 20 seconds
+  setTimeout(() => {
+    if (document.body.contains(notification)) {
+      notification.remove();
+    }
+  }, 20000);
+}

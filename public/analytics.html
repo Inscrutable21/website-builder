@@ -188,6 +188,11 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      // Global variables
+      let currentWebsiteId = '';
+      let websiteData = null;
+      let engagementChart = null;
+      
       // DOM Elements
       const websiteIdInput = document.getElementById('websiteIdInput');
       const loadWebsiteBtn = document.getElementById('loadWebsiteBtn');
@@ -214,11 +219,7 @@
       // Table elements
       const clickElementsTable = document.getElementById('clickElementsTable');
       
-      // Charts
-      let engagementChart;
-      let currentWebsiteId = '';
-      let websiteData = null;
- 
+      // Check URL for websiteId parameter
       const urlParams = new URLSearchParams(window.location.search);
       const websiteIdParam = urlParams.get('websiteId');
       
@@ -226,6 +227,8 @@
         websiteIdInput.value = websiteIdParam;
         loadWebsite(websiteIdParam);
       }
+      
+      // Load recent websites from localStorage
       function loadRecentWebsites() {
         const recent = JSON.parse(localStorage.getItem('recentWebsites')) || [];
         recentWebsites.innerHTML = '';
@@ -249,6 +252,8 @@
           `;
           recentWebsites.appendChild(websiteItem);
         });
+        
+        // Add event listeners to recent website buttons
         document.querySelectorAll('.load-recent-btn').forEach(btn => {
           btn.addEventListener('click', function() {
             const websiteId = this.getAttribute('data-id');
@@ -257,22 +262,34 @@
           });
         });
       }
+      
+      // Format date helper
       function formatDate(timestamp) {
         const date = new Date(timestamp);
         return date.toLocaleDateString();
       }
+      
+      // Add to recent websites
       function addToRecentWebsites(websiteId) {
         const recent = JSON.parse(localStorage.getItem('recentWebsites')) || [];
+        
+        // Remove if already exists
         const filtered = recent.filter(site => site.id !== websiteId);
+        
+        // Add to beginning of array
         filtered.unshift({
           id: websiteId,
           date: Date.now()
         });
+        
+        // Keep only last 5
         const trimmed = filtered.slice(0, 5);
         
         localStorage.setItem('recentWebsites', JSON.stringify(trimmed));
         loadRecentWebsites();
       }
+      
+      // Initialize charts
       function initCharts() {
         const ctx = document.getElementById('engagementChart').getContext('2d');
         
@@ -313,6 +330,8 @@
           }
         });
       }
+      
+      // Update chart data
       function updateChartData(type, timeRange) {
         const chartData = generateChartData(type, timeRange);
         
@@ -345,11 +364,14 @@
         
         const labels = [];
         const data = [];
+        
+        // Generate dates for labels
         for (let i = days - 1; i >= 0; i--) {
           const date = new Date();
           date.setDate(date.getDate() - i);
           labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-
+          
+          // Generate random data based on type
           let value;
           switch (type) {
             case 'visitors':
@@ -394,244 +416,246 @@
       }
       
       // Load website data and initialize analytics
-      // Load website data and initialize analytics
-// Load website data and initialize analytics
-function loadWebsite(websiteId) {
-  if (!websiteId) {
-    alert('Please enter a valid Website ID');
-    return;
-  }
-  
-  currentWebsiteId = websiteId;
-  analyticsContent.classList.remove('hidden');
-  loadingIndicator.classList.remove('hidden');
-  
-  // Update URL parameter
-  const url = new URL(window.location);
-  url.searchParams.set('websiteId', websiteId);
-  window.history.pushState({}, '', url);
-  
-  // Add to recent websites
-  addToRecentWebsites(websiteId);
-  
-  // Fetch the website data with better error handling
-  fetch(`/website/${websiteId}`)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`Website not found (Status: ${response.status})`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      websiteData = data;
-      
-      // Update title
-      websiteTitle.textContent = `Analytics for Website: ${websiteId}`;
-      
-      // Load the website in the iframe
-      websiteFrame.srcdoc = data.previewHtml;
-      
-      // Wait for iframe to load
-      websiteFrame.onload = function() {
-        // Initialize heatmap in the iframe
-        initializeIframeHeatmap();
+      function loadWebsite(websiteId) {
+        if (!websiteId) {
+          alert('Please enter a valid Website ID');
+          return;
+        }
         
-        // Fetch website stats - with separate promise chain
-        fetch(`/website-stats/${websiteId}?timeRange=${timeRangeSelect.value}`)
+        currentWebsiteId = websiteId;
+        analyticsContent.classList.remove('hidden');
+        loadingIndicator.classList.remove('hidden');
+        
+        // Update URL parameter
+        const url = new URL(window.location);
+        url.searchParams.set('websiteId', websiteId);
+        window.history.pushState({}, '', url);
+        
+        // Add to recent websites
+        addToRecentWebsites(websiteId);
+        
+        // Use the dedicated API endpoint
+        fetch(`/api/website/${websiteId}`)
           .then(response => {
             if (!response.ok) {
-              throw new Error(`Stats not found (Status: ${response.status})`);
+              throw new Error(`Website not found (Status: ${response.status})`);
             }
             return response.json();
           })
-          .then(stats => {
-            // Update stats
-            updateStats(stats);
+          .then(data => {
+            websiteData = data;
             
-            // Initialize or update charts
+            // Update title
+            websiteTitle.textContent = `Analytics for Website: ${websiteId}`;
+            
+            // Load the website in the iframe
+            websiteFrame.srcdoc = data.previewHtml;
+            
+            // Wait for iframe to load
+            websiteFrame.onload = function() {
+              // Initialize heatmap in the iframe
+              initializeIframeHeatmap();
+              
+              // Fetch website stats
+              fetch(`/website-stats/${websiteId}?timeRange=${timeRangeSelect.value}`)
+                .then(response => {
+                  if (!response.ok) {
+                    throw new Error(`Stats not found (Status: ${response.status})`);
+                  }
+                  return response.json();
+                })
+                .then(stats => {
+                  // Update stats
+                  updateStats(stats);
+                  
+                  // Initialize or update charts
+                  if (!engagementChart) {
+                    initCharts();
+                  }
+                  updateChartData(chartTypeSelect.value, timeRangeSelect.value);
+                  
+                  // Update most clicked elements table
+                  updateClickElementsTable(stats.clickElements || []);
+                })
+                .catch(error => {
+                  console.error('Error loading website stats:', error);
+                })
+                .finally(() => {
+                  // Hide loading indicator
+                  loadingIndicator.classList.add('hidden');
+                });
+            };
+          })
+          .catch(error => {
+            console.error('Error loading website:', error);
+            
+            // Create a fallback demo website for testing
+            const fallbackHtml = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Demo Website</title>
+                <style>
+                  body { font-family: Arial, sans-serif; padding: 20px; }
+                  h1 { color: #4361ee; }
+                  .container { max-width: 800px; margin: 0 auto; }
+                  .btn { 
+                    display: inline-block; 
+                    padding: 10px 20px; 
+                    background: #4361ee; 
+                    color: white; 
+                    border-radius: 5px;
+                    cursor: pointer;
+                    margin: 10px 5px;
+                  }
+                  .content { margin: 20px 0; line-height: 1.6; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h1>Demo Website</h1>
+                  <div class="content">
+                    <p>This is a sample website for testing analytics.</p>
+                    <p>The actual website with ID: ${websiteId} was not found, but you can still see how the heatmap works.</p>
+                    <p>Try clicking on different parts of this page to generate heatmap data.</p>
+                  </div>
+                  <div class="buttons">
+                    <button class="btn">Click Me</button>
+                    <button class="btn">Another Button</button>
+                    <button class="btn">Third Button</button>
+                  </div>
+                </div>
+              </body>
+              </html>
+            `;
+            
+            // Update UI with fallback content
+            websiteTitle.textContent = `Demo Analytics (Website ID: ${websiteId} not found)`;
+            websiteFrame.srcdoc = fallbackHtml;
+            
+            // Use mock stats
+            const mockStats = {
+              uniqueVisitors: 0,
+              totalClicks: 0,
+              averageTimeOnPage: 0,
+              averageScrollDepth: 0,
+              visitorsTrend: 0,
+              clicksTrend: 0,
+              timeTrend: 0,
+              scrollTrend: 0,
+              lastActivity: Date.now(),
+              clickElements: [],
+              clickCount: 0,
+              optimizationStatus: {
+                isOptimized: false,
+                optimizedVersions: 0,
+                nextOptimizationAt: 50
+              }
+            };
+            
+            // Update UI with mock data
+            updateStats(mockStats);
             if (!engagementChart) {
               initCharts();
             }
             updateChartData(chartTypeSelect.value, timeRangeSelect.value);
+            updateClickElementsTable([]);
             
-            // Update most clicked elements table
-            updateClickElementsTable(stats.clickElements || []);
-          })
-          .catch(error => {
-            console.error('Error loading website stats:', error);
-            // Continue showing the website even if stats fail to load
-          })
-          .finally(() => {
             // Hide loading indicator
             loadingIndicator.classList.add('hidden');
           });
-      };
-    })
-    .catch(error => {
-      console.error('Error loading website:', error);
-      
-      // Create a fallback demo website for testing
-      const fallbackHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Demo Website</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #4361ee; }
-            .container { max-width: 800px; margin: 0 auto; }
-            .btn { 
-              display: inline-block; 
-              padding: 10px 20px; 
-              background: #4361ee; 
-              color: white; 
-              border-radius: 5px;
-              cursor: pointer;
-              margin: 10px 5px;
-            }
-            .content { margin: 20px 0; line-height: 1.6; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>Demo Website</h1>
-            <div class="content">
-              <p>This is a sample website for testing analytics.</p>
-              <p>The actual website with ID: ${websiteId} was not found, but you can still see how the heatmap works.</p>
-              <p>Try clicking on different parts of this page to generate heatmap data.</p>
-            </div>
-            <div class="buttons">
-              <button class="btn">Click Me</button>
-              <button class="btn">Another Button</button>
-              <button class="btn">Third Button</button>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      // Update UI with fallback content
-      websiteTitle.textContent = `Demo Analytics (Website ID: ${websiteId} not found)`;
-      websiteFrame.srcdoc = fallbackHtml;
-      
-      // Wait for iframe to load
-      websiteFrame.onload = function() {
-        // Initialize heatmap in the iframe
-        initializeIframeHeatmap();
-        
-        // Use mock stats
-        const mockStats = {
-          uniqueVisitors: 42,
-          totalClicks: 156,
-          averageTimeOnPage: 120, // 2 minutes
-          averageScrollDepth: 65,
-          visitorsTrend: 8,
-          clicksTrend: 12,
-          timeTrend: -3,
-          scrollTrend: 5,
-          lastActivity: Date.now(),
-          clickElements: [
-            { path: 'button.btn', text: 'Click Me', count: 78 },
-            { path: 'div.container', text: '', count: 34 },
-            { path: 'button.btn:nth-child(2)', text: 'Another Button', count: 29 },
-            { path: 'h1', text: 'Demo Website', count: 15 }
-          ]
-        };
-        
-        // Update UI with mock data
-        updateStats(mockStats);
-        if (!engagementChart) {
-          initCharts();
-        }
-        updateChartData(chartTypeSelect.value, timeRangeSelect.value);
-        updateClickElementsTable(mockStats.clickElements);
-      };
-      
-      // Hide loading indicator
-      loadingIndicator.classList.add('hidden');
-    });
-}
-
+      }
       
       // Initialize heatmap in the iframe
       function initializeIframeHeatmap() {
-        const iframeDoc = websiteFrame.contentDocument || websiteFrame.contentWindow.document;
-        
-        // Create heatmap container in the iframe if it doesn't exist
-        let heatmapContainer = iframeDoc.getElementById('heatmapContainer');
-        if (!heatmapContainer) {
-          heatmapContainer = iframeDoc.createElement('div');
-          heatmapContainer.id = 'heatmapContainer';
-          heatmapContainer.style.width = '100%';
-          heatmapContainer.style.height = '100%';
-          heatmapContainer.style.position = 'absolute';
-          heatmapContainer.style.top = '0';
-          heatmapContainer.style.left = '0';
-          heatmapContainer.style.zIndex = '9999';
-          heatmapContainer.style.pointerEvents = 'none';
+        try {
+          const iframeDoc = websiteFrame.contentDocument || websiteFrame.contentWindow.document;
           
-          iframeDoc.body.appendChild(heatmapContainer);
-        }
-        
-        // Load heatmap.js in the iframe if needed
-        if (typeof iframeDoc.defaultView.h337 === 'undefined') {
-          const script = iframeDoc.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.2/heatmap.min.js';
-          script.onload = function() {
+          // Create heatmap container in the iframe if it doesn't exist
+          let heatmapContainer = iframeDoc.getElementById('heatmapContainer');
+          if (!heatmapContainer) {
+            heatmapContainer = iframeDoc.createElement('div');
+            heatmapContainer.id = 'heatmapContainer';
+            heatmapContainer.style.width = '100%';
+            heatmapContainer.style.height = '100%';
+            heatmapContainer.style.position = 'absolute';
+            heatmapContainer.style.top = '0';
+            heatmapContainer.style.left = '0';
+            heatmapContainer.style.zIndex = '9999';
+            heatmapContainer.style.pointerEvents = 'none';
+            
+            iframeDoc.body.appendChild(heatmapContainer);
+          }
+          
+          // Load heatmap.js in the iframe if needed
+          if (typeof iframeDoc.defaultView.h337 === 'undefined') {
+            const script = iframeDoc.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.2/heatmap.min.js';
+            script.onload = function() {
+              createHeatmapInstance(iframeDoc, heatmapContainer);
+            };
+            iframeDoc.head.appendChild(script);
+          } else {
             createHeatmapInstance(iframeDoc, heatmapContainer);
-          };
-          iframeDoc.head.appendChild(script);
-        } else {
-          createHeatmapInstance(iframeDoc, heatmapContainer);
+          }
+        } catch (error) {
+          console.error('Error initializing iframe heatmap:', error);
         }
       }
       
       // Create heatmap instance and load data
       function createHeatmapInstance(iframeDoc, heatmapContainer) {
-        const h337 = iframeDoc.defaultView.h337;
-        
-        // Initialize heatmap in the iframe
-        const heatmapInstance = h337.create({
-          container: heatmapContainer,
-          radius: 30,
-          maxOpacity: 0.6,
-          minOpacity: 0,
-          blur: 0.75
-        });
-        
-        // Load heatmap data
-        fetch(`/get-heatmap-data/${currentWebsiteId}`)
-          .then(response => response.json())
-          .then(heatmapData => {
-            if (heatmapData && heatmapData.length > 0) {
-              // Find the maximum count value for proper scaling
-              const maxValue = Math.max(...heatmapData.map(item => item.count || 1));
-              
-              // Format data for heatmap.js
-              const formattedData = {
-                max: maxValue,
-                data: heatmapData.map(item => ({
-                  x: item.x,
-                  y: item.y,
-                  value: item.count || 1
-                }))
-              };
-              
-              // Set data to heatmap in one batch operation
-              heatmapInstance.setData(formattedData);
-            }
-          })
-          .catch(error => {
-            console.error('Error loading heatmap data:', error);
+        try {
+          const h337 = iframeDoc.defaultView.h337;
+          
+          // Initialize heatmap in the iframe
+          const heatmapInstance = h337.create({
+            container: heatmapContainer,
+            radius: 30,
+            maxOpacity: 0.6,
+            minOpacity: 0,
+            blur: 0.75
           });
           
-        // Store the heatmap instance reference for later use
-        iframeDoc.defaultView.heatmapInstance = heatmapInstance;
+          // Load heatmap data for the current website
+          const websiteId = currentWebsiteId;
+          
+          // Load heatmap data
+          fetch(`/get-heatmap-data/${websiteId}`)
+            .then(response => response.json())
+            .then(heatmapData => {
+              if (heatmapData && heatmapData.length > 0) {
+                // Find the maximum count value for proper scaling
+                const maxValue = Math.max(...heatmapData.map(item => item.count || 1));
+                
+                // Format data for heatmap.js
+                const formattedData = {
+                  max: maxValue,
+                  data: heatmapData.map(item => ({
+                    x: item.x,
+                    y: item.y,
+                    value: item.count || 1
+                  }))
+                };
+                
+                // Set data to heatmap in one batch operation
+                heatmapInstance.setData(formattedData);
+              }
+            })
+            .catch(error => {
+              console.error('Error loading heatmap data:', error);
+            });
+            
+          // Store the heatmap instance reference for later use
+          iframeDoc.defaultView.heatmapInstance = heatmapInstance;
+        } catch (error) {
+          console.error('Error creating heatmap instance:', error);
+        }
       }
       
       // Update stats display
       function updateStats(stats) {
-        // Real data would come from the API
+        // Update stats display
         visitorCount.textContent = stats.uniqueVisitors || 0;
         clickCount.textContent = stats.totalClicks || 0;
         avgTime.textContent = formatTime(stats.averageTimeOnPage || 0);
@@ -646,7 +670,7 @@ function loadWebsite(websiteId) {
       
       // Update trend indicators
       function updateTrend(element, value) {
-        if (!value) value = 0;
+        if (!value && value !== 0) value = 0;
         
         const icon = element.querySelector('i');
         icon.className = value >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
@@ -700,18 +724,22 @@ function loadWebsite(websiteId) {
       });
       
       toggleHeatmapBtn.addEventListener('click', function() {
-        const iframe = websiteFrame.contentDocument || websiteFrame.contentWindow.document;
-        const heatmapContainer = iframe.getElementById('heatmapContainer');
-        
-        if (heatmapContainer) {
-          heatmapContainer.style.display = 
-            heatmapContainer.style.display === 'none' ? 'block' : 'none';
+        try {
+          const iframe = websiteFrame.contentDocument || websiteFrame.contentWindow.document;
+          const heatmapContainer = iframe.getElementById('heatmapContainer');
           
-          // Update button icon
-          toggleHeatmapBtn.innerHTML = 
-            heatmapContainer.style.display === 'none' ? 
-            '<i class="fas fa-eye"></i>' : 
-            '<i class="fas fa-eye-slash"></i>';
+          if (heatmapContainer) {
+            heatmapContainer.style.display = 
+              heatmapContainer.style.display === 'none' ? 'block' : 'none';
+            
+            // Update button icon
+            toggleHeatmapBtn.innerHTML = 
+              heatmapContainer.style.display === 'none' ? 
+              '<i class="fas fa-eye"></i>' : 
+              '<i class="fas fa-eye-slash"></i>';
+          }
+        } catch (error) {
+          console.error('Error toggling heatmap:', error);
         }
       });
       
@@ -738,21 +766,20 @@ function loadWebsite(websiteId) {
       });
       
       timeRangeSelect.addEventListener('change', function() {
-  if (currentWebsiteId) {
-    // Reload stats with new time range
-    fetch(`/website-stats/${currentWebsiteId}?timeRange=${this.value}`)  // Make sure this URL is correct
-      .then(response => response.json())
-      .then(stats => {
-        updateStats(stats);
-        updateChartData(chartTypeSelect.value, this.value);
-        updateClickElementsTable(stats.clickElements || []);
-      })
-      .catch(error => {
-        console.error('Error updating stats:', error);
+        if (currentWebsiteId) {
+          // Reload stats with new time range
+          fetch(`/website-stats/${currentWebsiteId}?timeRange=${this.value}`)
+            .then(response => response.json())
+            .then(stats => {
+              updateStats(stats);
+              updateChartData(chartTypeSelect.value, this.value);
+              updateClickElementsTable(stats.clickElements || []);
+            })
+            .catch(error => {
+              console.error('Error updating stats:', error);
+            });
+        }
       });
-  }
-});
-
       
       chartTypeSelect.addEventListener('change', function() {
         updateChartData(this.value, timeRangeSelect.value);

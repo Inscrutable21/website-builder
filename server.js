@@ -1,15 +1,10 @@
-/**
- * Main server file for AI Website Generator with Heatmap Analytics
- * Using OpenAI GPT-4o Mini
- */
-
-// Import dependencies
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const { v4: uuidv4 } = require('uuid');
 const OpenAI = require('openai');
+const fetch = require('node-fetch');
 
 // Load environment variables
 dotenv.config();
@@ -120,6 +115,9 @@ const inMemoryDatabase = {
   }
 };
 
+// UI Optimization Cache
+const optimizationCache = new Map(); // Cache to store optimization status by websiteId
+
 // Check if we have an OpenAI API key
 const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) {
@@ -205,6 +203,15 @@ const WebsiteSchema = new mongoose.Schema({
   },
   lastAccessed: Date,
   viewCount: {
+    type: Number,
+    default: 0
+  },
+  originalWebsiteId: String, // For optimized versions, reference to the original website
+  isOptimized: {
+    type: Boolean,
+    default: false
+  },
+  clickCount: {
     type: Number,
     default: 0
   }
@@ -398,7 +405,8 @@ app.post('/generate-website', async (req, res) => {
           css,
           js,
           previewHtml,
-          createdAt: new Date()
+          createdAt: new Date(),
+          clickCount: 0
         });
         
         await website.save();
@@ -416,7 +424,8 @@ app.post('/generate-website', async (req, res) => {
         previewHtml,
         createdAt: new Date(),
         lastAccessed: new Date(),
-        viewCount: 0
+        viewCount: 0,
+        clickCount: 0
       });
     }
     
@@ -441,11 +450,37 @@ app.post('/track-interaction', async (req, res) => {
       userAgent: req.headers['user-agent'] || 'unknown'
     };
     
+    const { websiteId, type } = interactionData;
+    
     // Save to database if connected
     if (dbConnected) {
       try {
         const interaction = new Interaction(interactionData);
         await interaction.save();
+        
+        // If this is a click, increment the click counter for the website
+        if (type === 'click') {
+          const website = await Website.findOne({ websiteId });
+          if (website) {
+            website.clickCount = (website.clickCount || 0) + 1;
+            await website.save();
+            
+            // Check if we need to optimize the UI (every 50 clicks)
+            if (website.clickCount % 50 === 0 && !website.isOptimized) {
+              console.log(`Optimization threshold reached (${website.clickCount} clicks) for website: ${websiteId}`);
+              
+              // Trigger optimization in the background
+              fetch(`http://localhost:${port}/optimize-ui/${websiteId}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              }).catch(error => {
+                console.error('Error triggering optimization:', error);
+              });
+            }
+          }
+        }
       } catch (dbError) {
         console.error('Error saving interaction to database:', dbError);
         // Fall back to in-memory storage
@@ -454,6 +489,29 @@ app.post('/track-interaction', async (req, res) => {
     } else {
       // Save to in-memory database
       inMemoryDatabase.addInteraction(interactionData);
+      
+      // Update click count for the website
+      if (type === 'click') {
+        const website = inMemoryDatabase.getWebsite(websiteId);
+        if (website) {
+          website.clickCount = (website.clickCount || 0) + 1;
+          
+          // Check if we need to optimize the UI (every 50 clicks)
+          if (website.clickCount % 50 === 0 && !website.isOptimized) {
+            console.log(`Optimization threshold reached (${website.clickCount} clicks) for website: ${websiteId}`);
+            
+            // Trigger optimization in the background
+            fetch(`http://localhost:${port}/optimize-ui/${websiteId}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }).catch(error => {
+              console.error('Error triggering optimization:', error);
+            });
+          }
+        }
+      }
     }
     
     res.status(200).send('Interaction recorded');
@@ -514,6 +572,13 @@ app.post('/reset-heatmap-data/:websiteId', async (req, res) => {
     if (dbConnected) {
       try {
         await Interaction.deleteMany({ websiteId });
+        
+        // Reset click count
+        const website = await Website.findOne({ websiteId });
+        if (website) {
+          website.clickCount = 0;
+          await website.save();
+        }
       } catch (dbError) {
         console.error('Error resetting heatmap data in database:', dbError);
         // Fall back to in-memory storage
@@ -522,6 +587,12 @@ app.post('/reset-heatmap-data/:websiteId', async (req, res) => {
     } else {
       // Reset in in-memory database
       inMemoryDatabase.clearInteractions(websiteId);
+      
+      // Reset click count
+      const website = inMemoryDatabase.getWebsite(websiteId);
+      if (website) {
+        website.clickCount = 0;
+      }
     }
     
     res.status(200).send('Heatmap data reset');
@@ -531,40 +602,300 @@ app.post('/reset-heatmap-data/:websiteId', async (req, res) => {
   }
 });
 
-// Get website by ID
-app.get('/website/:websiteId', async (req, res) => {
+// UI Optimization endpoint
+app.post('/optimize-ui/:websiteId', async (req, res) => {
+  try {
+    const { websiteId } = req.params;
+    const { forceOptimize } = req.query;
+    
+    // Check if we've recently optimized this website (prevent duplicate optimizations)
+    const lastOptimized = optimizationCache.get(websiteId);
+    const now = Date.now();
+    if (!forceOptimize && lastOptimized && now - lastOptimized < 60 * 60 * 1000) { // 1 hour cooldown
+      return res.json({
+        message: 'This website was recently optimized. Please wait before optimizing again.',
+        alreadyOptimized: true
+      });
+    }
+    
+    console.log(`Starting UI optimization for website: ${websiteId}`);
+    
+    // Get the website data
+    let website;
+    if (dbConnected) {
+      website = await Website.findOne({ websiteId });
+    } else {
+      website = inMemoryDatabase.getWebsite(websiteId);
+    }
+    
+    if (!website) {
+      return res.status(404).json({ error: 'Website not found' });
+    }
+    
+    // Get heatmap data
+    let heatmapData;
+    if (dbConnected) {
+      heatmapData = await Interaction.aggregate([
+        { $match: { type: 'click', websiteId } },
+        { $group: {
+            _id: { x: "$x", y: "$y" },
+            count: { $sum: 1 }
+          }
+        },
+        { $project: {
+            x: "$_id.x",
+            y: "$_id.y",
+            count: 1,
+            _id: 0
+          }
+        }
+      ]);
+    } else {
+      heatmapData = inMemoryDatabase.getHeatmapData(websiteId);
+    }
+    
+    // Get click elements data
+    let clickElements;
+    if (dbConnected) {
+      clickElements = await Interaction.aggregate([
+        { $match: { websiteId, type: 'click', path: { $exists: true, $ne: null } } },
+        { $group: {
+            _id: "$path",
+            count: { $sum: 1 },
+            text: { $first: "$elementText" }
+          }
+        },
+        { $project: {
+            path: "$_id",
+            count: 1,
+            text: 1,
+            _id: 0
+          }
+        },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]);
+    } else {
+      // For in-memory DB, we need to generate this from raw interactions
+      const clickInteractions = inMemoryDatabase.getInteractions(websiteId)
+        .filter(interaction => interaction.type === 'click' && interaction.path);
+      
+      // Group by path
+      const pathGroups = {};
+      clickInteractions.forEach(interaction => {
+        const { path, elementText } = interaction;
+        if (!pathGroups[path]) {
+          pathGroups[path] = {
+            path,
+            count: 0,
+            text: elementText
+          };
+        }
+        pathGroups[path].count++;
+      });
+      
+      // Convert to array and sort
+      clickElements = Object.values(pathGroups)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    }
+    
+    // Check if we have enough data to optimize
+    if (heatmapData.length < 10 && !forceOptimize) {
+      return res.json({
+        message: 'Not enough interaction data to optimize UI. Need at least 10 unique click positions.',
+        sufficientData: false
+      });
+    }
+    
+    // Extract the HTML, CSS, and JS from the website
+    const html = website.html || '';
+    const css = website.css || '';
+    const js = website.js || '';
+    
+    // Format the heatmap data for the AI
+    const formattedHeatmapData = heatmapData.map(point => 
+      `Coordinates (${point.x}, ${point.y}): ${point.count} clicks`
+    ).join('\n');
+    
+    // Format the click elements data for the AI
+    const formattedClickElements = clickElements.map(element => 
+      `- ${element.path}${element.text ? ` (Text: "${element.text}")` : ''}: ${element.count} clicks`
+    ).join('\n');
+    
+    // Create the prompt for the AI
+    const prompt = `
+      I need you to optimize a website's UI based on user interaction data. 
+      
+      Here's the current website code:
+      
+      HTML:
+      \`\`\`html
+      ${html}
+      \`\`\`
+      
+      CSS:
+      \`\`\`css
+      ${css}
+      \`\`\`
+      
+      JavaScript:
+      \`\`\`javascript
+      ${js}
+      \`\`\`
+      
+      User interaction data:
+      
+      Most clicked elements (from most to least clicked):
+      ${formattedClickElements || 'No element-specific click data available.'}
+      
+      Heatmap data (coordinates and click counts):
+      ${formattedHeatmapData || 'No heatmap data available.'}
+      
+      Please optimize the website UI with the following guidelines:
+      1. Make the most frequently clicked elements more prominent (larger, better positioned, more visible)
+      2. Adjust layouts to prioritize high-interaction areas
+      3. Improve visibility of important elements that aren't getting enough attention
+      4. Maintain the overall design aesthetic and functionality
+      5. Ensure the website remains responsive and works on all screen sizes
+      6. Don't remove any functionality, just optimize the UI
+      
+      Return only the optimized HTML, CSS, and JavaScript code as separate code blocks with appropriate language identifiers.
+    `;
+    
+    // Check if OpenAI client is initialized
+    if (!openai) {
+      return res.status(500).json({ error: 'OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable.' });
+    }
+    
+    // Call the OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { 
+          role: "system", 
+          content: "You are an expert UI/UX designer and front-end developer. Your task is to analyze user interaction data and optimize website interfaces to improve user experience and conversion rates."
+        },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000,
+    });
+    
+    // Extract the optimized code
+    const responseText = completion.choices[0].message.content;
+    const htmlMatch = responseText.match(/```html\s*([\s\S]*?)\s*```/);
+    const cssMatch = responseText.match(/```css\s*([\s\S]*?)\s*```/);
+    const jsMatch = responseText.match(/```javascript\s*([\s\S]*?)\s*```/) || 
+                  responseText.match(/```js\s*([\s\S]*?)\s*```/);
+    
+    if (!htmlMatch) {
+      throw new Error('Could not extract HTML from the generated content');
+    }
+    
+    const optimizedHtml = htmlMatch[1];
+    const optimizedCss = cssMatch ? cssMatch[1] : '';
+    const optimizedJs = jsMatch ? jsMatch[1] : '';
+    
+    // Create the optimized preview HTML
+    const optimizedWebsiteId = `${websiteId}-optimized-${Date.now()}`;
+    const optimizedPreviewHtml = createCompleteHtml(
+      optimizedHtml, 
+      optimizedCss, 
+      optimizedJs, 
+      optimizedWebsiteId
+    );
+    
+    // Save the optimized website
+    if (dbConnected) {
+      const optimizedWebsite = new Website({
+        websiteId: optimizedWebsiteId,
+        html: optimizedHtml,
+        css: optimizedCss,
+        js: optimizedJs,
+        previewHtml: optimizedPreviewHtml,
+        createdAt: new Date(),
+        originalWebsiteId: websiteId,
+        isOptimized: true,
+        clickCount: 0
+      });
+      
+      await optimizedWebsite.save();
+    } else {
+      inMemoryDatabase.addWebsite({
+        websiteId: optimizedWebsiteId,
+        html: optimizedHtml,
+        css: optimizedCss,
+        js: optimizedJs,
+        previewHtml: optimizedPreviewHtml,
+        createdAt: new Date(),
+        lastAccessed: new Date(),
+        viewCount: 0,
+        originalWebsiteId: websiteId,
+        isOptimized: true,
+        clickCount: 0
+      });
+    }
+    
+    // Update optimization cache
+    optimizationCache.set(websiteId, now);
+    
+    console.log(`UI optimization completed for website: ${websiteId}`);
+    
+    res.json({
+      message: 'UI successfully optimized',
+      originalWebsiteId: websiteId,
+      optimizedWebsiteId: optimizedWebsiteId
+    });
+  } catch (error) {
+    console.error('Error in optimize-ui endpoint:', error);
+    res.status(500).json({ error: 'Failed to optimize UI', details: error.message });
+  }
+});
+
+// API endpoint for getting website data (for analytics dashboard)
+app.get('/api/website/:websiteId', async (req, res) => {
   try {
     const { websiteId } = req.params;
     
-    // Try to get from database if connected
-    let website = null;
+    // Get the website data
+    let website;
     if (dbConnected) {
-      try {
-        website = await Website.findOne({ websiteId });
-        
-        if (website) {
-          // Update last accessed time and view count
-          website.lastAccessed = new Date();
-          website.viewCount += 1;
-          await website.save();
-        }
-      } catch (dbError) {
-        console.error('Error retrieving website from database:', dbError);
-      }
+      website = await Website.findOne({ websiteId });
+    } else {
+      website = inMemoryDatabase.getWebsite(websiteId);
     }
     
-    // If not in database, check in-memory storage
-    if (!website) {
-      website = inMemoryDatabase.getWebsite(websiteId);
+    // If website not found, check if there's an optimized version
+    if (!website && !websiteId.includes('-optimized-')) {
+      let optimizedWebsite;
+      
+      if (dbConnected) {
+        // Find the latest optimized version
+        optimizedWebsite = await Website.findOne({ 
+          originalWebsiteId: websiteId,
+          isOptimized: true
+        }).sort({ createdAt: -1 });
+      } else {
+        // For in-memory DB
+        const optimizedVersions = inMemoryDatabase.websites
+          .filter(site => site.originalWebsiteId === websiteId && site.isOptimized)
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
+        optimizedWebsite = optimizedVersions[0];
+      }
+      
+      if (optimizedWebsite) {
+        return res.json(optimizedWebsite);
+      }
     }
     
     // If still not found, create a mock website for testing
     if (!website) {
-      console.log(`Website not found, creating mock for ID: ${websiteId}`);
-      website = {
-        websiteId,
-        previewHtml: `
-          <!DOCTYPE html>
+      console.log(`Website not found for analytics, creating mock for ID: ${websiteId}`);
+      
+      const mockHtml = `
+        <!DOCTYPE html>
           <html>
           <head>
             <title>Demo Website</title>
@@ -595,15 +926,9 @@ app.get('/website/:websiteId', async (req, res) => {
                 border: none;
                 font-size: 16px;
               }
-              .btn:hover {
-                background: #3a56d4;
-              }
               .content { 
                 margin: 20px 0; 
                 line-height: 1.6;
-              }
-              p {
-                margin-bottom: 1rem;
               }
             </style>
           </head>
@@ -628,20 +953,274 @@ app.get('/website/:websiteId', async (req, res) => {
             </script>
           </body>
           </html>
-        `,
+        `;
+        
+        website = {
+          websiteId,
+          html: '',
+          css: '',
+          js: '',
+          previewHtml: mockHtml,
+          createdAt: new Date(),
+          lastAccessed: new Date(),
+          viewCount: 1,
+          clickCount: 0
+        };
+        
+        // Save the mock website to in-memory database
+        inMemoryDatabase.addWebsite(website);
+      }
+      
+      res.json(website);
+  } catch (error) {
+    console.error('Error fetching website for analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch website', details: error.message });
+  }
+});
+// Get the latest optimized version of a website
+app.get('/optimized-website/:websiteId', async (req, res) => {
+  try {
+    const { websiteId } = req.params;
+    
+    // Find the latest optimized version of this website
+    let optimizedWebsite;
+    
+    if (dbConnected) {
+      // Query for websites that have this websiteId as their originalWebsiteId
+      // Sort by createdAt in descending order to get the most recent
+      optimizedWebsite = await Website.findOne({ 
+        originalWebsiteId: websiteId,
+        isOptimized: true
+      }).sort({ createdAt: -1 });
+    } else {
+      // For in-memory DB
+      const optimizedVersions = inMemoryDatabase.websites
+        .filter(site => site.originalWebsiteId === websiteId && site.isOptimized)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      optimizedWebsite = optimizedVersions[0];
+    }
+    
+    if (!optimizedWebsite) {
+      return res.status(404).json({ 
+        message: 'No optimized version found',
+        originalWebsiteId: websiteId
+      });
+    }
+    
+    res.json(optimizedWebsite);
+  } catch (error) {
+    console.error('Error fetching optimized website:', error);
+    res.status(500).json({ error: 'Failed to fetch optimized website', details: error.message });
+  }
+});
+
+// Serve website by ID (with automatic redirection to optimized version)
+app.get('/website/:websiteId', async (req, res) => {
+  try {
+    const { websiteId } = req.params;
+    const { original, format } = req.query; // Added format parameter
+    
+    // Check if this is an API request (wants JSON) or a direct website view
+    const wantsJson = format === 'json' || req.headers.accept?.includes('application/json');
+    
+    // Check if this is an optimized website ID
+    let website;
+    if (dbConnected) {
+      website = await Website.findOne({ websiteId });
+      
+      if (website) {
+        // Update last accessed time and view count
+        website.lastAccessed = new Date();
+        website.viewCount += 1;
+        await website.save();
+      }
+    } else {
+      website = inMemoryDatabase.getWebsite(websiteId);
+      if (website) {
+        website.lastAccessed = new Date();
+        website.viewCount = (website.viewCount || 0) + 1;
+      }
+    }
+    
+    // If website not found or if original parameter is not set, check if there's an optimized version
+    if ((!website || original !== 'true') && !websiteId.includes('-optimized-')) {
+      let optimizedWebsite;
+      
+      if (dbConnected) {
+        // Find the latest optimized version
+        optimizedWebsite = await Website.findOne({ 
+          originalWebsiteId: websiteId,
+          isOptimized: true
+        }).sort({ createdAt: -1 });
+      } else {
+        // For in-memory DB
+        const optimizedVersions = inMemoryDatabase.websites
+          .filter(site => site.originalWebsiteId === websiteId && site.isOptimized)
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
+        optimizedWebsite = optimizedVersions[0];
+      }
+      
+      if (optimizedWebsite) {
+        // If JSON is requested, return the optimized website data
+        if (wantsJson) {
+          return res.json(optimizedWebsite);
+        }
+        
+        // Otherwise redirect to the optimized version if it exists and original is not forced
+        if (original !== 'true') {
+          console.log(`Redirecting to optimized version: ${optimizedWebsite.websiteId}`);
+          return res.redirect(`/website/${optimizedWebsite.websiteId}`);
+        }
+      }
+    }
+    
+    // If still not found, create a mock website for testing
+    if (!website) {
+      console.log(`Website not found, creating mock for ID: ${websiteId}`);
+      
+      const mockHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Demo Website</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 20px;
+              margin: 0;
+              line-height: 1.6;
+            }
+            h1 { 
+              color: #4361ee; 
+              margin-bottom: 1rem;
+            }
+            .container { 
+              max-width: 800px; 
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .btn { 
+              display: inline-block; 
+              padding: 10px 20px; 
+              background: #4361ee; 
+              color: white; 
+              border-radius: 5px;
+              cursor: pointer;
+              margin: 10px 5px;
+              border: none;
+              font-size: 16px;
+            }
+            .btn:hover {
+              background: #3a56d4;
+            }
+            .content { 
+              margin: 20px 0; 
+              line-height: 1.6;
+            }
+            p {
+              margin-bottom: 1rem;
+            }
+            .optimization-badge {
+              position: fixed;
+              top: 10px;
+              right: 10px;
+              background: rgba(67, 97, 238, 0.9);
+              color: white;
+              padding: 5px 10px;
+              border-radius: 20px;
+              font-size: 12px;
+              z-index: 1000;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Demo Website</h1>
+            <div class="content">
+              <p>This is a sample website for ID: ${websiteId}</p>
+              <p>The actual website content is not available, but you can still see how the heatmap tracking works.</p>
+              <p>Try clicking on different parts of this page to generate heatmap data.</p>
+              <p>After 50 clicks, the system will automatically optimize the UI based on user interactions.</p>
+            </div>
+            <div class="buttons">
+              <button class="btn">Click Me</button>
+              <button class="btn">Another Button</button>
+              <button class="btn">Third Button</button>
+            </div>
+          </div>
+          <script src="/heatmap-tracker.js"></script>
+          <script>
+            // Initialize heatmap with the website ID
+            initializeHeatmap('${websiteId}');
+          </script>
+        </body>
+        </html>
+      `;
+      
+      website = {
+        websiteId,
+        html: mockHtml,
+        css: '',
+        js: '',
+        previewHtml: mockHtml,
         createdAt: new Date(),
         lastAccessed: new Date(),
-        viewCount: 1
+        viewCount: 1,
+        clickCount: 0
       };
       
       // Save the mock website to in-memory database
       inMemoryDatabase.addWebsite(website);
     }
     
-    res.json(website);
+    // If JSON is requested, return the website data as JSON
+    if (wantsJson) {
+      return res.json(website);
+    }
+    
+    // Add optimization badge if this is an optimized version
+    let htmlToSend = website.previewHtml;
+    if (website.isOptimized && !htmlToSend.includes('optimization-badge')) {
+      htmlToSend = htmlToSend.replace('</body>', `
+        <div class="optimization-badge">
+          <span>✨ Optimized UI</span>
+        </div>
+        </body>
+      `);
+    }
+    
+    // Send the website HTML directly for browser viewing
+    res.send(htmlToSend);
   } catch (error) {
-    console.error('Error fetching website:', error);
-    res.status(500).json({ error: 'Failed to fetch website' });
+    console.error('Error serving website:', error);
+    
+    // Return JSON error if JSON was requested
+    if (req.query.format === 'json' || req.headers.accept?.includes('application/json')) {
+      return res.status(500).json({ error: 'Failed to fetch website', details: error.message });
+    }
+    
+    // Otherwise send HTML error page
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+            .error-container { max-width: 600px; margin: 50px auto; }
+            h1 { color: #ef476f; }
+          </style>
+        </head>
+        <body>
+          <div class="error-container">
+            <h1>Error Loading Website</h1>
+            <p>There was a problem loading the website. Please try again later.</p>
+            <p>Error details: ${error.message}</p>
+          </div>
+        </body>
+      </html>
+    `);
   }
 });
 
@@ -662,12 +1241,37 @@ app.get('/website-stats/:websiteId', async (req, res) => {
       timeTrend: -3,
       scrollTrend: 12,
       lastActivity: Date.now(),
-      clickElements: []
+      clickElements: [],
+      clickCount: 0,
+      optimizationStatus: {
+        isOptimized: false,
+        optimizedVersions: 0,
+        nextOptimizationAt: 0
+      }
     };
     
     // Try to get real stats from database if connected
     if (dbConnected) {
       try {
+        // Get website info
+        const website = await Website.findOne({ websiteId });
+        if (website) {
+          stats.clickCount = website.clickCount || 0;
+          
+          // Calculate next optimization threshold
+          const nextOptimizationThreshold = Math.ceil(stats.clickCount / 50) * 50;
+          stats.optimizationStatus.nextOptimizationAt = nextOptimizationThreshold;
+        }
+        
+        // Check if optimized versions exist
+        const optimizedVersionsCount = await Website.countDocuments({
+          originalWebsiteId: websiteId,
+          isOptimized: true
+        });
+        
+        stats.optimizationStatus.optimizedVersions = optimizedVersionsCount;
+        stats.optimizationStatus.isOptimized = optimizedVersionsCount > 0;
+        
         // Get unique visitors (unique session IDs)
         const uniqueVisitors = await Interaction.distinct('sessionId', { 
           websiteId,
@@ -729,20 +1333,83 @@ app.get('/website-stats/:websiteId', async (req, res) => {
         
         // Update stats with real data
         stats = {
+          ...stats,
           uniqueVisitors: uniqueVisitors || 0,
           totalClicks: totalClicks || 0,
           averageTimeOnPage: averageTimeOnPage || 0,
           averageScrollDepth: averageScrollDepth || 0,
-          visitorsTrend: 5,  // Mock trend values for now
-          clicksTrend: 8,
-          timeTrend: -3,
-          scrollTrend: 12,
           lastActivity: lastActivity || Date.now(),
           clickElements: clickElements || []
         };
       } catch (dbError) {
         console.error('Error retrieving website stats from database:', dbError);
       }
+    } else {
+      // For in-memory database
+      const website = inMemoryDatabase.getWebsite(websiteId);
+      if (website) {
+        stats.clickCount = website.clickCount || 0;
+        
+        // Calculate next optimization threshold
+        const nextOptimizationThreshold = Math.ceil(stats.clickCount / 50) * 50;
+        stats.optimizationStatus.nextOptimizationAt = nextOptimizationThreshold;
+      }
+      
+      // Check if optimized versions exist
+      const optimizedVersions = inMemoryDatabase.websites
+        .filter(site => site.originalWebsiteId === websiteId && site.isOptimized);
+      
+      stats.optimizationStatus.optimizedVersions = optimizedVersions.length;
+      stats.optimizationStatus.isOptimized = optimizedVersions.length > 0;
+      
+      // Get interaction data
+      const interactions = inMemoryDatabase.getInteractions(websiteId);
+      
+      // Count unique session IDs
+      const uniqueSessions = new Set();
+      interactions.forEach(interaction => {
+        if (interaction.sessionId) {
+          uniqueSessions.add(interaction.sessionId);
+        }
+      });
+      
+      // Count clicks
+      const clicks = interactions.filter(interaction => interaction.type === 'click');
+      
+      // Get last activity
+      const sortedByTime = [...interactions].sort((a, b) => b.timestamp - a.timestamp);
+      const lastActivity = sortedByTime.length > 0 ? sortedByTime[0].timestamp : Date.now();
+      
+      // Get click elements data
+      const clickInteractions = interactions.filter(interaction => interaction.type === 'click' && interaction.path);
+      
+      // Group by path
+      const pathGroups = {};
+      clickInteractions.forEach(interaction => {
+        const { path, elementText } = interaction;
+        if (!pathGroups[path]) {
+          pathGroups[path] = {
+            path,
+            count: 0,
+            text: elementText
+          };
+        }
+        pathGroups[path].count++;
+      });
+      
+      // Convert to array and sort
+      const clickElements = Object.values(pathGroups)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+      
+      // Update stats with in-memory data
+      stats = {
+        ...stats,
+        uniqueVisitors: uniqueSessions.size,
+        totalClicks: clicks.length,
+        lastActivity: lastActivity,
+        clickElements: clickElements
+      };
     }
     
     // If no click elements data, generate mock data
@@ -762,6 +1429,137 @@ app.get('/website-stats/:websiteId', async (req, res) => {
   }
 });
 
+// Compare original and optimized websites
+app.get('/compare-websites/:originalId/:optimizedId', (req, res) => {
+  const { originalId, optimizedId } = req.params;
+  
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Website Comparison</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+        .comparison-container {
+          display: flex;
+          height: 100vh;
+        }
+        .website-frame {
+          flex: 1;
+          border: none;
+          height: 100%;
+          border-right: 1px solid #ccc;
+        }
+        .comparison-header {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          background: rgba(0,0,0,0.8);
+          color: white;
+          padding: 10px;
+          display: flex;
+          justify-content: space-between;
+          z-index: 1000;
+        }
+        .header-section {
+          text-align: center;
+          flex: 1;
+        }
+        .header-title {
+          font-weight: bold;
+          margin-bottom: 5px;
+        }
+        .toggle-btn {
+          background: #4361ee;
+          color: white;
+          border: none;
+          padding: 8px 15px;
+          border-radius: 4px;
+          cursor: pointer;
+          margin: 0 10px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="comparison-header">
+        <div class="header-section">
+          <div class="header-title">Original Version</div>
+          <div id="original-id">${originalId}</div>
+        </div>
+        <div class="header-section">
+          <button id="toggleHeatmapBtn" class="toggle-btn">
+            Show Heatmap
+          </button>
+          <button id="switchViewBtn" class="toggle-btn">
+            View Full Screen
+          </button>
+        </div>
+        <div class="header-section">
+          <div class="header-title">Optimized Version</div>
+          <div id="optimized-id">${optimizedId}</div>
+        </div>
+      </div>
+      
+      <div class="comparison-container">
+        <iframe id="originalFrame" class="website-frame" src="/website/${originalId}?original=true"></iframe>
+        <iframe id="optimizedFrame" class="website-frame" src="/website/${optimizedId}"></iframe>
+      </div>
+      
+      <script>
+        document.getElementById('toggleHeatmapBtn').addEventListener('click', function() {
+          const frames = [
+            document.getElementById('originalFrame').contentWindow,
+            document.getElementById('optimizedFrame').contentWindow
+          ];
+          
+          frames.forEach(frame => {
+            try {
+              // Try to toggle heatmap in each iframe
+              const heatmapContainer = frame.document.getElementById('heatmapContainer');
+              if (heatmapContainer) {
+                const isVisible = heatmapContainer.style.display !== 'none';
+                heatmapContainer.style.display = isVisible ? 'none' : 'block';
+              }
+            } catch (e) {
+              console.error('Error toggling heatmap:', e);
+            }
+          });
+          
+          this.textContent = this.textContent === 'Show Heatmap' ? 'Hide Heatmap' : 'Show Heatmap';
+        });
+        
+        document.getElementById('switchViewBtn').addEventListener('click', function() {
+          const container = document.querySelector('.comparison-container');
+          const frames = document.querySelectorAll('.website-frame');
+          
+          if (frames[0].style.display === 'none') {
+            // Show both frames
+            frames.forEach(frame => {
+              frame.style.display = 'block';
+              frame.style.flex = '1';
+            });
+            this.textContent = 'View Full Screen';
+          } else if (frames[1].style.flex === '0') {
+            // Show only optimized
+            frames[0].style.display = 'none';
+            frames[1].style.display = 'block';
+            frames[1].style.flex = '1';
+            this.textContent = 'View Original';
+          } else {
+            // Show only original
+            frames[1].style.flex = '0';
+            frames[1].style.display = 'none';
+            frames[0].style.display = 'block';
+            this.textContent = 'View Optimized';
+          }
+        });
+      </script>
+    </body>
+    </html>
+  `);
+});
+
 // Test analytics page
 app.get('/test-analytics', (req, res) => {
   const testId = 'test-' + Math.random().toString(36).substring(2, 10);
@@ -770,7 +1568,7 @@ app.get('/test-analytics', (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Analytics Test Page</title>
+      <title>Analytics & Auto-Optimization Test</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
         .container { max-width: 800px; margin: 0 auto; }
@@ -791,25 +1589,124 @@ app.get('/test-analytics', (req, res) => {
           border-radius: 5px;
           margin-top: 20px;
         }
+        .click-counter {
+          font-size: 24px;
+          font-weight: bold;
+          margin: 20px 0;
+        }
+        .progress-container {
+          width: 100%;
+          background-color: #e0e0e0;
+          border-radius: 4px;
+          margin: 10px 0 20px;
+        }
+        .progress-bar {
+          height: 20px;
+          background-color: #4361ee;
+          border-radius: 4px;
+          width: 0%;
+          transition: width 0.3s ease;
+        }
+        .action-buttons {
+          display: flex;
+          gap: 10px;
+          margin-top: 20px;
+        }
+        .optimize-btn {
+          background: #7209b7;
+        }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="card">
-          <h1>Analytics Test Page</h1>
-          <p>This is a test page to verify the analytics system is working correctly.</p>
-          <p>Generated test ID: <strong>${testId}</strong></p>
-          <p>Click the button below to view analytics for this test page:</p>
-          <a href="/analytics?websiteId=${testId}" class="btn" target="_blank">View Analytics</a>
+          <h1>Analytics & Auto-Optimization Test</h1>
+          <p>This page demonstrates the automatic UI optimization after 50 clicks.</p>
+          <p>Generated test ID: <strong id="websiteId">${testId}</strong></p>
+          
+          <div class="click-counter">
+            Clicks: <span id="clickCount">0</span> / 50
+          </div>
+          
+          <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          
+          <p>Click anywhere on this page to generate interaction data. After 50 clicks, the system will automatically optimize the UI.</p>
+          
+          <div class="action-buttons">
+            <a href="/analytics?websiteId=${testId}" class="btn" target="_blank">View Analytics</a>
+            <button id="optimizeBtn" class="btn optimize-btn">Force Optimize Now</button>
+          </div>
+        </div>
+        
+        <div class="card">
+          <h2>Click Test Area</h2>
+          <p>Click on different elements below to generate varied interaction data:</p>
+          
+          <div style="display: flex; justify-content: space-between; margin: 30px 0;">
+            <button class="btn" style="background: #f72585;">Button 1</button>
+            <button class="btn" style="background: #7209b7;">Button 2</button>
+            <button class="btn" style="background: #3a0ca3;">Button 3</button>
+          </div>
+          
+          <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam euismod, nisi vel consectetur interdum, nisl nisi consectetur nisl, eget consectetur nisl nisi vel nisl.</p>
+          
+          <h3>Subheading Example</h3>
+          <p>Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Donec velit neque, auctor sit amet aliquam vel, ullamcorper sit amet ligula.</p>
         </div>
       </div>
+      
       <script src="/heatmap-tracker.js"></script>
       <script>
         // Initialize heatmap with the test ID
         initializeHeatmap('${testId}');
         
-        // Log that tracking is active
-        console.log('Heatmap tracking initialized with ID:', '${testId}');
+        // Track clicks
+        let clickCount = 0;
+        const clickCountElement = document.getElementById('clickCount');
+        const progressBar = document.getElementById('progressBar');
+        const websiteId = '${testId}';
+        
+        document.addEventListener('click', function() {
+          clickCount++;
+          clickCountElement.textContent = clickCount;
+          
+          // Update progress bar
+          const progress = (clickCount / 50) * 100;
+          progressBar.style.width = Math.min(progress, 100) + '%';
+          
+          // Check if we've reached 50 clicks
+          if (clickCount === 50) {
+            alert('50 clicks reached! The system will now optimize the UI based on your interactions.');
+          }
+        });
+        
+        // Force optimize button
+        document.getElementById('optimizeBtn').addEventListener('click', function() {
+          this.disabled = true;
+          this.textContent = 'Optimizing...';
+          
+          fetch('/optimize-ui/' + websiteId + '?forceOptimize=true', {
+            method: 'POST'
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.optimizedWebsiteId) {
+              alert('UI successfully optimized! Click OK to view the optimized version.');
+              window.open('/website/' + data.optimizedWebsiteId, '_blank');
+            } else {
+              alert('Optimization response: ' + data.message);
+            }
+            this.textContent = 'Optimization Complete';
+          })
+          .catch(error => {
+            console.error('Error optimizing:', error);
+            alert('Error optimizing: ' + error.message);
+            this.textContent = 'Optimization Failed';
+            this.disabled = false;
+          });
+        });
       </script>
     </body>
     </html>

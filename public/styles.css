@@ -587,3 +587,116 @@ textarea:focus {
     flex-direction: column;
   }
 }
+/* Optimization Controls */
+/* Optimization Controls */
+.optimization-controls {
+  background-color: var(--light-gray);
+  border-radius: var(--border-radius-md);
+  padding: 1rem;
+  margin-top: 1.5rem;
+  border: 1px solid var(--medium-gray);
+}
+
+.optimization-controls h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  color: var(--secondary-color);
+  margin-bottom: 0.75rem;
+}
+
+.optimization-status {
+  font-size: 0.9rem;
+  color: var(--dark-gray);
+  margin-bottom: 1rem;
+}
+
+.optimization-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.optimization-message {
+  padding: 0.75rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.optimization-message.info {
+  background-color: rgba(67, 97, 238, 0.1);
+  color: var(--primary-color);
+}
+
+.optimization-message.success {
+  background-color: rgba(76, 201, 240, 0.1);
+  color: var(--success-color);
+}
+
+.optimization-message.error {
+  background-color: rgba(239, 71, 111, 0.1);
+  color: var(--danger-color);
+}
+/* Optimization Notification */
+.optimization-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  max-width: 350px;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.notification-content {
+  padding: 15px;
+}
+
+.notification-content h3 {
+  margin: 0 0 10px;
+  color: #4361ee;
+}
+
+.notification-content p {
+  margin: 0 0 15px;
+  font-size: 14px;
+}
+
+.notification-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.view-optimized-btn, .dismiss-btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.view-optimized-btn {
+  background: #4361ee;
+  color: white;
+}
+
+.dismiss-btn {
+  background: #e9ecef;
+  color: #495057;
+}
