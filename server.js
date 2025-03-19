@@ -6,17 +6,17 @@ const { v4: uuidv4 } = require('uuid');
 const OpenAI = require('openai');
 const fetch = require('node-fetch');
 
-// Load environment variables
+
 dotenv.config();
 
-// Import database connection utilities
+
 const mongoose = require('mongoose');
 
-// Initialize Express app
+
 const app = express();
 const port = process.env.PORT || 3002;
 
-// Middleware
+
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST'],

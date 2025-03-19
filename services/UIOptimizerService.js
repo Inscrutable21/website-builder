@@ -62,27 +62,54 @@ ${css}
 ${js}
 \\\`
 
-### *User Interaction Data:*
-- *Most Clicked Elements (Ranked):*  
-  ${formattedClickElements}  
-- *Heatmap Data (Click Locations & Frequency):*  
-  ${formattedHeatmapData}  
+User interaction data:
+Most clicked elements (ranked):
+${formattedClickElements || 'No element-specific click data available.'}
+Heatmap data (coordinates and intensity):
+${formattedHeatmapData || 'No heatmap data available.'}
+Requirements:
 
-### *Optimization Guidelines:*
-1. *If the most clicked element is a section, move it **directly below the hero banner* for better visibility.  
-2. *If the most clicked element is a button, reposition it **inside the hero banner* to increase engagement.  
-3. *Ensure smooth animations* when repositioning elements to avoid sudden layout shifts.  
-4. *Update the JavaScript logic* so the adjustments occur dynamically based on user interactions.  
-5. *Maintain responsiveness* across all screen sizes while applying these changes.  
-6. *Preserve all existing functionality*—do not remove anything, only improve the layout.  
+Intelligently reposition frequently clicked elements to prime locations:
+
+Move top-clicked elements to the header/top navigation
+Use fixed positioning for consistently accessed elements
 
 
-### *Expected Output:*
-- You will need to re-generate the html based on the new preferred position of the html element
-- Return the *optimized HTML, CSS, and JavaScript* separately.  
-- Ensure JavaScript *modifies the DOM dynamically* to move the most clicked section *below the hero banner* and buttons *inside the hero section*.  
-- *Do NOT just highlight elements*—physically move them in the layout.  
-- *Only return the optimized code* without additional explanations.  
+Transform the layout based on heatmap insights:
+
+Redesign page sections to prioritize high-interaction areas
+Cluster related high-value elements together
+Create clear visual pathways to important content
+
+
+Enhance visibility through strategic design:
+
+Apply appropriate visual hierarchy (size, color, contrast)
+Implement subtle attention-drawing animations
+Use whitespace to isolate and emphasize key elements
+
+
+Streamline user journeys:
+
+Reduce clicks needed to reach popular destinations
+Create shortcuts to frequently accessed content
+Consider adding a persistent navigation element for top interactions
+
+
+Technical requirements:
+
+Maintain responsive design across all screen sizes
+Preserve all existing functionality
+Keep brand identity consistent
+Ensure accessibility standards are met
+
+
+
+Your response should include ONLY the restructured code with no explanations:
+
+HTML code block
+CSS code block
+JavaScript code block
 `;
       
       // Call the OpenAI API
