@@ -44,43 +44,46 @@ class UIOptimizerService {
       
       // Create the prompt for the AI
       const prompt = `
-        I need you to optimize a website's UI based on user interaction data. 
-        
-        Here's the current website code:
-        
-        HTML:
-        \`\`\`html
-        ${html}
-        \`\`\`
-        
-        CSS:
-        \`\`\`css
-        ${css}
-        \`\`\`
-        
-        JavaScript:
-        \`\`\`javascript
-        ${js}
-        \`\`\`
-        
-        User interaction data:
-        
-        Most clicked elements (from most to least clicked):
-        ${formattedClickElements}
-        
-        Heatmap data (coordinates and click counts):
-        ${formattedHeatmapData}
-        
-        Please optimize the website UI with the following guidelines:
-        1. Make the most frequently clicked elements more prominent (larger, better positioned, more visible)
-        2. Adjust layouts to prioritize high-interaction areas
-        3. Improve visibility of important elements that aren't getting enough attention
-        4. Maintain the overall design aesthetic and functionality
-        5. Ensure the website remains responsive and works on all screen sizes
-        6. Don't remove any functionality, just optimize the UI
-        
-        Return only the optimized HTML, CSS, and JavaScript code as separate code blocks with appropriate language identifiers.
-      `;
+I need you to *dynamically reposition website elements* based on real-time user interaction data.  
+Use the given heatmap data to rearrange the most clicked elements for *better visibility and usability*.
+
+
+### Website Code:
+*HTML:*
+\\\`html
+${html}
+\\\`
+*CSS:*
+\\\`css
+${css}
+\\\`
+*JavaScript:*
+\\\`javascript
+${js}
+\\\`
+
+### *User Interaction Data:*
+- *Most Clicked Elements (Ranked):*  
+  ${formattedClickElements}  
+- *Heatmap Data (Click Locations & Frequency):*  
+  ${formattedHeatmapData}  
+
+### *Optimization Guidelines:*
+1. *If the most clicked element is a section, move it **directly below the hero banner* for better visibility.  
+2. *If the most clicked element is a button, reposition it **inside the hero banner* to increase engagement.  
+3. *Ensure smooth animations* when repositioning elements to avoid sudden layout shifts.  
+4. *Update the JavaScript logic* so the adjustments occur dynamically based on user interactions.  
+5. *Maintain responsiveness* across all screen sizes while applying these changes.  
+6. *Preserve all existing functionality*—do not remove anything, only improve the layout.  
+
+
+### *Expected Output:*
+- You will need to re-generate the html based on the new preferred position of the html element
+- Return the *optimized HTML, CSS, and JavaScript* separately.  
+- Ensure JavaScript *modifies the DOM dynamically* to move the most clicked section *below the hero banner* and buttons *inside the hero section*.  
+- *Do NOT just highlight elements*—physically move them in the layout.  
+- *Only return the optimized code* without additional explanations.  
+`;
       
       // Call the OpenAI API
       const completion = await this.openai.chat.completions.create({

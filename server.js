@@ -725,7 +725,8 @@ app.post('/optimize-ui/:websiteId', async (req, res) => {
     
     // Create the prompt for the AI
     const prompt = `
-      I need you to optimize a website's UI based on user interaction data. 
+     I need you to restructure a website's UI based on user interaction data to optimize user experience.
+
       
       Here's the current website code:
       
@@ -745,22 +746,28 @@ app.post('/optimize-ui/:websiteId', async (req, res) => {
       \`\`\`
       
       User interaction data:
-      
-      Most clicked elements (from most to least clicked):
-      ${formattedClickElements || 'No element-specific click data available.'}
-      
-      Heatmap data (coordinates and click counts):
-      ${formattedHeatmapData || 'No heatmap data available.'}
-      
-      Please optimize the website UI with the following guidelines:
-      1. Make the most frequently clicked elements more prominent (larger, better positioned, more visible)
-      2. Adjust layouts to prioritize high-interaction areas
-      3. Improve visibility of important elements that aren't getting enough attention
-      4. Maintain the overall design aesthetic and functionality
-      5. Ensure the website remains responsive and works on all screen sizes
-      6. Don't remove any functionality, just optimize the UI
-      
-      Return only the optimized HTML, CSS, and JavaScript code as separate code blocks with appropriate language identifiers.
+Most clicked elements (from most to least clicked):
+${formattedClickElements || 'No element-specific click data available.'}
+Heatmap data (coordinates and click counts):
+${formattedHeatmapData || 'No heatmap data available.'}
+Please restructure and optimize the website UI with the following guidelines:
+
+Completely reposition frequently clicked elements to prime locations (e.g., top of page, center, or fixed navigation) based on their importance
+Redesign the layout to prioritize high-interaction areas revealed by the heatmap data
+Use hierarchy principles to emphasize important elements through:
+
+Strategic positioning (top, center, or fixed elements)
+Visual prominence (size, color contrast, whitespace)
+Subtle animations to draw attention (hover effects, gentle pulsing)
+
+
+Simplify user journeys by reducing clicks needed to reach popular destinations
+Maintain the overall brand aesthetic while reorganizing elements
+Ensure the restructured website remains responsive and works on all screen sizes
+Preserve all existing functionality, just optimize the UI and layout
+
+Return the restructured HTML, CSS, and JavaScript code as separate code blocks with appropriate language identifiers.
+
     `;
     
     // Check if OpenAI client is initialized
