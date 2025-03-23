@@ -193,7 +193,7 @@ if (openaiApiKey) {
 }
 
 // Initialize Hugging Face Image Generation Service
-const huggingFaceApiKey = process.env.HUGGING_FACE_API_KEY || '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';
+const huggingFaceApiKey = process.env.HUGGING_FACE_API_KEY;
 let imageService = mockImageService;
 if (huggingFaceApiKey) {
   try {
