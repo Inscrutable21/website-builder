@@ -30,4 +30,5 @@ const InteractionSchema = new mongoose.Schema({
   elementText: String
 });
 
-module.exports = mongoose.model('Interaction', InteractionSchema);
+// Check if the model already exists before creating it
+module.exports = mongoose.models.Interaction || mongoose.model('Interaction', InteractionSchema);

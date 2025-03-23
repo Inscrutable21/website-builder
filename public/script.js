@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // DOM Elements with null checks
+  // DOM Elements
   const rawPromptTextarea = document.getElementById('rawPrompt');
   const enhancedPromptDiv = document.getElementById('enhancedPrompt');
   const enhanceBtn = document.getElementById('enhanceBtn');
@@ -15,9 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const viewAnalyticsBtn = document.getElementById('viewAnalyticsBtn');
   const closePreviewBtn = document.getElementById('closePreviewBtn');
 
-  // Store the current website ID
+  // Store the current website ID and images
   let currentWebsiteId = null;
   let optimizedWebsiteId = null;
+  let websiteImages = [];
 
   // Workflow steps
   const steps = document.querySelectorAll('.step');
@@ -205,9 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
       // Update workflow step
       updateWorkflowSteps(3);
 
-      // Show loading indicator
+      // Show loading indicator with image generation message
       if (websiteLoadingIndicator) {
-        showLoading(websiteLoadingIndicator, 'Crafting your beautiful website...');
+        showLoading(websiteLoadingIndicator, 'Generating images and crafting your beautiful website...');
       }
 
       // Make sure website output is visible but show loading state
@@ -232,8 +233,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const data = await response.json();
         
-        // Store the website ID for later use
+        // Store the website ID and image paths
         currentWebsiteId = data.websiteId;
+        websiteImages = data.imagePaths || [];
 
         // If there's a preview HTML, display it in an iframe
         if (data.previewHtml && websitePreview) {
@@ -352,40 +354,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Add placeholder text animation
-  if (rawPromptTextarea) {
-    const placeholderText = "Enter your content here... We'll transform it into a structured, beautiful website.";
-    let currentPlaceholder = "";
-    let placeholderIndex = 0;
-
-    function animatePlaceholder() {
-      if (placeholderIndex <= placeholderText.length) {
-        currentPlaceholder = placeholderText.substring(0, placeholderIndex);
-        rawPromptTextarea.setAttribute('placeholder', currentPlaceholder);
-        placeholderIndex++;
-        setTimeout(animatePlaceholder, 50);
-      } else {
-        // Reset after a delay
-        setTimeout(() => {
-          placeholderIndex = 0;
-          animatePlaceholder();
-        }, 5000);
-      }
-    }
-
-    // Start the placeholder animation
-    animatePlaceholder();
-
-    // Focus the input textarea on load
-    rawPromptTextarea.focus();
-  }
-  
   // UI Optimization Functions
   function addOptimizationControls() {
     // Check if preview footer exists
     const previewFooter = document.querySelector('.preview-footer');
     if (!previewFooter) {
       console.warn('Preview footer not found, cannot add optimization controls');
+      return;
+    }
+    
+    // Check if optimization controls already exist
+    if (document.querySelector('.optimization-controls')) {
       return;
     }
     
@@ -410,6 +389,16 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
       </div>
       <div id="optimizationMessage" class="optimization-message"></div>
+      <div class="image-gallery" style="margin-top: 15px;">
+        <h4>Generated Images</h4>
+        <div class="image-thumbnails" style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+          ${websiteImages.map(path => `
+            <div class="image-thumbnail" style="width: 100px; height: 100px; overflow: hidden; border-radius: 4px; border: 1px solid #ddd;">
+              <img src="${path}" alt="Generated image" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+          `).join('')}
+        </div>
+      </div>
     `;
     
     // Add to website preview footer
@@ -434,6 +423,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const compareVersionsBtn = document.getElementById('compareVersionsBtn');
     if (compareVersionsBtn) {
       compareVersionsBtn.addEventListener('click', compareVersions);
+    }
+    
+    // Hide the image gallery if no images
+    if (!websiteImages || websiteImages.length === 0) {
+      const imageGallery = optimizationControls.querySelector('.image-gallery');
+      if (imageGallery) {
+        imageGallery.style.display = 'none';
+      }
     }
   }
 
@@ -557,5 +554,33 @@ document.addEventListener('DOMContentLoaded', () => {
       messageElement.textContent = message;
       messageElement.className = `optimization-message ${type}`;
     }
+  }
+
+  // Add placeholder text animation
+  if (rawPromptTextarea) {
+    const placeholderText = "Enter your content here... We'll transform it into a structured, beautiful website.";
+    let currentPlaceholder = "";
+    let placeholderIndex = 0;
+
+    function animatePlaceholder() {
+      if (placeholderIndex <= placeholderText.length) {
+        currentPlaceholder = placeholderText.substring(0, placeholderIndex);
+        rawPromptTextarea.setAttribute('placeholder', currentPlaceholder);
+        placeholderIndex++;
+        setTimeout(animatePlaceholder, 50);
+      } else {
+        // Reset after a delay
+        setTimeout(() => {
+          placeholderIndex = 0;
+          animatePlaceholder();
+        }, 5000);
+      }
+    }
+
+    // Start the placeholder animation
+    animatePlaceholder();
+
+    // Focus the input textarea on load
+    rawPromptTextarea.focus();
   }
 });
