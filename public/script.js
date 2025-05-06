@@ -304,10 +304,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Setup view button functionality
         if (viewWebsiteBtn) {
           viewWebsiteBtn.onclick = () => {
-            const newTab = window.open('', '_blank');
-            if (newTab) {
-              newTab.document.write(data.previewHtml);
-              newTab.document.close();
+            if (currentWebsiteId) {
+              // Open the website in a new tab using the website ID
+              window.open(`/website/${currentWebsiteId}`, '_blank');
+            } else {
+              alert('Website ID not available. Please regenerate the website.');
             }
           };
         }
@@ -374,6 +375,14 @@ document.addEventListener('DOMContentLoaded', () => {
     optimizationControls.innerHTML = `
       <h3><i class="fas fa-magic"></i> UI Optimization</h3>
       <p class="optimization-status">Analyzing user interactions to improve UI...</p>
+      <div class="optimization-level-selector">
+        <label for="optimizationLevel">Optimization Level:</label>
+        <select id="optimizationLevel" class="select-control">
+          <option value="minimal">Minimal - Subtle improvements</option>
+          <option value="standard" selected>Standard - Balanced optimization</option>
+          <option value="aggressive">Aggressive - Major redesign</option>
+        </select>
+      </div>
       <div class="optimization-actions">
         <button id="checkOptimizationBtn" class="action-btn">
           <i class="fas fa-sync"></i> Check for Optimizations
@@ -489,11 +498,20 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
-    showOptimizationMessage('Optimizing UI based on user interactions... This may take a minute.', 'info');
+    // Get the selected optimization level
+    const optimizationLevel = document.getElementById('optimizationLevel')?.value || 'standard';
+    
+    showOptimizationMessage(`Optimizing UI (${optimizationLevel}) based on user interactions... This may take a minute.`, 'info');
     
     try {
       const response = await fetch(`/optimize-ui/${currentWebsiteId}?forceOptimize=true`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          optimizationLevel: optimizationLevel
+        })
       });
       
       if (!response.ok) {
@@ -504,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (data.optimizedWebsiteId) {
         showOptimizationMessage(
-          `UI successfully optimized! The new version prioritizes elements that users interact with most.`,
+          `UI successfully optimized (${optimizationLevel})! The new version prioritizes elements that users interact with most.`,
           'success'
         );
         

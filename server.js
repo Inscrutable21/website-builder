@@ -737,8 +737,11 @@ app.get('/optimized-website/:websiteId', async (req, res) => {
 app.get('/website/:websiteId', async (req, res) => {
   try {
     const { websiteId } = req.params;
-    const { original, format } = req.query; // Optional: original version or JSON format
+    const { original, format, showOriginal } = req.query; // Add showOriginal parameter
 
+    // If showOriginal is true, skip the mock creation and return 404 if not found
+    const skipMockCreation = showOriginal === 'true';
+    
     const wantsJson = format === 'json' || (req.headers.accept && req.headers.accept.includes('application/json'));
 
     let website;
@@ -800,6 +803,11 @@ app.get('/website/:websiteId', async (req, res) => {
 
     // If website still not found, create a mock
     if (!website) {
+      // If showOriginal is true, don't create a mock
+      if (skipMockCreation) {
+        return res.status(404).send('Original website not found');
+      }
+      
       console.log(`Website not found, creating mock for ID: ${websiteId}`);
 
       const mockHtml = `

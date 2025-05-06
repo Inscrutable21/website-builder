@@ -62,6 +62,9 @@ class UIOptimizerService {
       const protectedSectionsFound = this._identifyProtectedSections(html);
       console.log('Protected sections found:', protectedSectionsFound.map(s => s.name));
 
+      // Analyze user behavior patterns
+      const userPatterns = this._analyzeUserBehavior(heatmapData, clickElements);
+      
       // Format the heatmap data for the AI
       const formattedHeatmapData = this._formatHeatmapData(heatmapData);
 
@@ -69,26 +72,27 @@ class UIOptimizerService {
       const formattedClickElements = this._formatClickElements(clickElements);
 
       // Create the prompt for the AI with protection instructions
-      const prompt = this._createOptimizationPrompt(
+      const prompt = this._createEnhancedOptimizationPrompt(
         html, 
         css, 
         js, 
         formattedClickElements, 
         formattedHeatmapData, 
-        protectedSectionsFound
+        protectedSectionsFound,
+        userPatterns
       );
 
-      // Call the OpenAI API
+      // Call the OpenAI API with improved parameters
       const completion = await this.openai.chat.completions.create({
         model: this.model,
         messages: [
           {
             role: "system",
-            content: "You are an expert UI/UX designer and front-end developer. Your task is to analyze user interaction data and optimize website interfaces to improve user experience and conversion rates, while respecting certain structural constraints."
+            content: "You are an expert UI/UX designer and front-end developer specializing in conversion rate optimization. Your task is to analyze user interaction data and optimize website interfaces to improve user experience, engagement metrics, and conversion rates, while respecting structural constraints."
           },
           { role: "user", content: prompt }
         ],
-        temperature: 0.7,
+        temperature: 0.5, // Lower temperature for more consistent results
         max_tokens: 4000,
       });
 
@@ -161,11 +165,113 @@ class UIOptimizerService {
     return foundSections;
   }
 
-  _createOptimizationPrompt(html, css, js, clickElements, heatmapData, protectedSections) {
+  _analyzeUserBehavior(heatmapData, clickElements) {
+    const patterns = {
+      focusAreas: [],
+      ignoredAreas: [],
+      scrollDepth: 0,
+      commonPathways: []
+    };
+    
+    // Identify focus areas (high click density)
+    if (heatmapData && heatmapData.length > 0) {
+      // Group clicks by proximity
+      const clusters = this._clusterClicksByProximity(heatmapData);
+      
+      // Sort clusters by total clicks
+      const sortedClusters = clusters.sort((a, b) => b.totalClicks - a.totalClicks);
+      
+      // Top 3 clusters are focus areas
+      patterns.focusAreas = sortedClusters.slice(0, 3).map(cluster => ({
+        x: cluster.centerX,
+        y: cluster.centerY,
+        intensity: cluster.totalClicks
+      }));
+      
+      // Areas with very few clicks are ignored areas
+      patterns.ignoredAreas = this._identifyIgnoredAreas(heatmapData);
+      
+      // Estimate scroll depth from click positions
+      if (heatmapData.length > 0) {
+        const maxY = Math.max(...heatmapData.map(point => point.y));
+        patterns.scrollDepth = maxY;
+      }
+    }
+    
+    // Analyze click elements for common pathways
+    if (clickElements && clickElements.length > 0) {
+      patterns.commonPathways = this._identifyCommonPathways(clickElements);
+    }
+    
+    return patterns;
+  }
+
+  _clusterClicksByProximity(heatmapData) {
+    const clusters = [];
+    const proximityThreshold = 100; // pixels
+    
+    for (const point of heatmapData) {
+      let addedToCluster = false;
+      
+      // Try to add to existing cluster
+      for (const cluster of clusters) {
+        const distance = Math.sqrt(
+          Math.pow(point.x - cluster.centerX, 2) + 
+          Math.pow(point.y - cluster.centerY, 2)
+        );
+        
+        if (distance < proximityThreshold) {
+          // Add to this cluster
+          cluster.points.push(point);
+          cluster.totalClicks += point.count || 1;
+          
+          // Recalculate center
+          cluster.centerX = cluster.points.reduce((sum, p) => sum + p.x, 0) / cluster.points.length;
+          cluster.centerY = cluster.points.reduce((sum, p) => sum + p.y, 0) / cluster.points.length;
+          
+          addedToCluster = true;
+          break;
+        }
+      }
+      
+      // If not added to any cluster, create new one
+      if (!addedToCluster) {
+        clusters.push({
+          points: [point],
+          centerX: point.x,
+          centerY: point.y,
+          totalClicks: point.count || 1
+        });
+      }
+    }
+    
+    return clusters;
+  }
+
+  _identifyIgnoredAreas(heatmapData) {
+    // Implementation depends on your page structure
+    // This is a simplified version
+    return [];
+  }
+
+  _identifyCommonPathways(clickElements) {
+    // Simplified implementation
+    return clickElements.slice(0, 5).map(el => el.selector || el.path);
+  }
+
+  _createEnhancedOptimizationPrompt(html, css, js, clickElements, heatmapData, protectedSections, userPatterns) {
     // Create a list of protection instructions
     const protectionInstructions = protectedSections.map(section => 
       `- ${section.name} (${section.selector}): ${section.description}`
     ).join('\n');
+
+    // Format user behavior patterns
+    const patternInsights = `
+USER BEHAVIOR INSIGHTS:
+- Focus Areas: Users concentrate clicks at ${userPatterns.focusAreas.length} main areas of the page
+- Scroll Depth: Users typically scroll to ${userPatterns.scrollDepth}px down the page
+- Common Pathways: Users frequently interact with: ${userPatterns.commonPathways.join(', ')}
+`;
 
     return `
 I need you to optimize a website's UI based on real user interaction data while respecting structural constraints.
@@ -195,6 +301,8 @@ ${clickElements || 'No element-specific click data available.'}
 Heatmap data (coordinates and click counts):
 ${heatmapData || 'No heatmap data available.'}
 
+${patternInsights}
+
 IMPORTANT STRUCTURAL CONSTRAINTS:
 The following sections MUST remain in their original structural position (though their internal components can be optimized):
 ${protectionInstructions}
@@ -207,22 +315,34 @@ OPTIMIZATION REQUIREMENTS:
    - You MAY add visual emphasis to elements within protected sections
    - You MUST keep all functionality of protected sections intact
 
-2. Make the most frequently clicked elements more prominent by:
-   - Increasing their size
-   - Using more vibrant colors
-   - Improving their positioning (within their parent container)
-   - Adding subtle animations to draw attention
+2. AGGRESSIVE CONTENT RESHUFFLING:
+   - PRIORITIZE reshuffling content blocks based on user engagement
+   - Move high-engagement blocks to the top of their parent containers
+   - If a block in position 3 gets more clicks than blocks 1 and 2, move it to position 1
+   - Group related elements that receive high engagement together
 
-3. Adjust the layout to prioritize high-interaction areas:
+3. Make the most frequently clicked elements more prominent by:
+   - Increasing their size by 10-20%
+   - Using more vibrant colors with higher contrast
+   - Improving their positioning for better visibility
+   - Adding subtle animations or visual cues to draw attention
+   - Adding borders or shadows to create visual emphasis
+
+4. Layout optimization:
    - Move important content above the fold (except protected sections)
-   - Group related elements that receive high engagement
-   - Create clearer visual hierarchy
+   - Increase whitespace around high-engagement elements
+   - Reduce prominence of low-engagement elements (make smaller or less vibrant)
+   - Create a clearer visual hierarchy emphasizing popular elements
+   - Add visual cues to guide users to important content
+   - Implement progressive disclosure for less-used content
 
-4. Technical requirements:
+5. Technical requirements:
    - Maintain responsive design (must work on mobile and desktop)
    - Keep all functionality intact (don't remove features)
-   - Preserve all images and their positions
+   - Preserve all images but resize/reposition based on engagement
    - Ensure accessibility (maintain proper contrast, focus states, etc.)
+   - Add subtle micro-interactions for frequently used elements
+   - Optimize load order to prioritize visible and interactive elements
 
 IMPORTANT: Return ONLY the optimized code blocks with NO explanations or comments outside the code blocks. Use exactly these formats:
 
@@ -261,9 +381,18 @@ IMPORTANT: Return ONLY the optimized code blocks with NO explanations or comment
       return "No element-specific click data available.";
     }
 
-    return clickElements.map(element => 
-      `- ${element.path}${element.text ? ` (Text: "${element.text}")` : ''}: ${element.count} clicks`
-    ).join('\n');
+    // Sort by click count (descending)
+    const sortedElements = [...clickElements].sort((a, b) => b.count - a.count);
+  
+    // Calculate engagement score (relative to highest clicks)
+    const maxClicks = sortedElements[0].count;
+  
+    return sortedElements.map((element, index) => {
+      const engagementScore = Math.round((element.count / maxClicks) * 100);
+      const priority = index < 3 ? "HIGH PRIORITY" : index < 6 ? "MEDIUM PRIORITY" : "LOW PRIORITY";
+      
+      return `- ${element.path}${element.text ? ` (Text: "${element.text}")` : ''}: ${element.count} clicks, ${engagementScore}% engagement, ${priority}`;
+    }).join('\n');
   }
 
   _extractCodeFromResponse(responseText) {
